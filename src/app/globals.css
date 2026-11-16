@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Design tokens taken from the Figma file (Color styles + inspected values) */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-jakarta: var(--font-plus-jakarta), ui-sans-serif, system-ui,
+    sans-serif;
+
+  --color-dark: #042053; /* Dark */
+  --color-blue: #285ce0; /* Blue */
+  --color-body: #667085; /* Body Fonts / General Grey */
+  --color-bg-light-blue: #f5f9ff; /* Background Light Blue */
+  --color-line: #e8eaed; /* Lines Colour */
+  --color-black-50: #fbfaf9;
+  --color-black-100: #f6f4f3;
+  --color-black-200: #ebe7e5;
+  --color-black-700: #504238;
+}
+
+html,
+body {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-bg-light-blue);
+  color: var(--color-dark);
+}
+
+
+/* ---------- Workspace document editor (Figma "A4 - 1") ---------- */
+.doc-editor {
+  outline: none;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: -0.02em;
+}
+.doc-editor h1 {
+  color: #101d37;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.doc-editor h2 {
+  color: #101d37;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.doc-editor h3 {
+  color: #101d37;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+/* section rhythm: 30px between sections, 10px heading → text */
+.doc-editor > * + * { margin-top: 10px; }
+.doc-editor > * + .node-heading { margin-top: 30px; }
+.doc-editor > p[data-subtitle] { margin-top: 4px; }
+.doc-editor ul { list-style: disc; padding-left: 18px; }
+.doc-editor ol { list-style: decimal; padding-left: 18px; }
+.doc-editor li > p { margin: 0; }
+.doc-editor a { color: #285ce0; text-decoration: underline; }
+.doc-editor strong { color: #101d37; font-weight: 600; }
+.doc-editor hr { border: 0; border-top: 1px solid #ededf0; margin: 20px 0; }
+.doc-editor img { max-width: 100%; height: auto; border-radius: 8px; }
+.doc-editor img.ProseMirror-selectednode { outline: 2px solid #285ce0; }
+.doc-editor .doc-comment {
+  color: #285ce0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.doc-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #98a2b3;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.doc-editor ::selection { background: rgba(40, 92, 224, 0.18); }
