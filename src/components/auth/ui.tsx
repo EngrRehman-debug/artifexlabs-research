@@ -16,7 +16,7 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
-export function Field({ label, icon: Icon, id, ...props }: FieldProps) {
+export function Field({ label, icon: Icon, id, required = true, ...props }: FieldProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, "-");
   return (
     <div className="flex w-full flex-col gap-1.5">
@@ -30,6 +30,7 @@ export function Field({ label, icon: Icon, id, ...props }: FieldProps) {
         <Icon className="size-4 shrink-0 text-body" />
         <input
           id={inputId}
+          required={required}
           className="w-full min-w-0 bg-transparent text-sm leading-5 font-medium text-dark outline-none placeholder:text-body"
           {...props}
         />

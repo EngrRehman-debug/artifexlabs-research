@@ -15,6 +15,20 @@ import { CURRENT_USER, type Comment } from "@/lib/workspaceDoc";
  *        "Reply" Inter 600 10 #285CE0, "Resolve" Inter 600 10 #667085
  */
 function Avatar({ src, name }: { src: string; name: string }) {
+  if (!src)
+    return (
+      <span
+        aria-label={name}
+        className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-blue/10 text-[11px] font-semibold text-blue"
+      >
+        {name
+          .split(" ")
+          .map((w) => w[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()}
+      </span>
+    );
   return (
     <Image
       src={src}

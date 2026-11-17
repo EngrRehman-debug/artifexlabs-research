@@ -7,7 +7,7 @@ import Icon, { huge, untitled } from "@/components/dashboard/Icon";
 import TopBar from "@/components/dashboard/TopBar";
 import ProjectsPanel from "@/components/dashboard/ProjectsPanel";
 import { StageBar, StatusBadge } from "@/components/dashboard/ProjectUi";
-import { PROJECTS } from "@/lib/projects";
+import { useAllProjects } from "@/lib/createdProjects";
 
 /*
  * Column x-offsets measured from the row's outer-left edge in Figma:
@@ -21,6 +21,7 @@ const HEAD_GRID =
   "grid grid-cols-[minmax(0,1fr)_136.12px_124px_134.82px_101.2px] items-center";
 
 export default function ProjectsPage() {
+  const projects = useAllProjects();
   return (
     <div className="flex min-w-0 flex-1">
       <ProjectsPanel />
@@ -59,7 +60,7 @@ export default function ProjectsPage() {
 
             {/* Mobile: stacked cards (not in Figma – desktop-only design) */}
             <ul className="mt-3 flex flex-col gap-2 md:hidden">
-              {PROJECTS.map((p) => (
+              {projects.map((p) => (
                 <li key={p.code}>
                   <Link
                     href={`/projects/${p.slug}`}
@@ -108,7 +109,7 @@ export default function ProjectsPage() {
 
                 {/* Rows */}
                 <div className="flex flex-col gap-2">
-                  {PROJECTS.map((p) => (
+                  {projects.map((p) => (
                     <Link
                       key={p.code}
                       href={`/projects/${p.slug}`}

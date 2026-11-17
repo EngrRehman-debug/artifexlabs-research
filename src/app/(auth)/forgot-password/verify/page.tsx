@@ -50,6 +50,10 @@ export default function VerifyCodePage() {
         className="flex flex-col gap-6"
         onSubmit={(e) => {
           e.preventDefault();
+          if (digits.some((d) => !d)) {
+            focus(digits.findIndex((d) => !d));
+            return;
+          }
           router.push("/forgot-password/reset");
         }}
       >

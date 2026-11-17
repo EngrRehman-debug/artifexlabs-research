@@ -1,0 +1,175 @@
+"use client";
+
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import { Add01Icon, Cancel01Icon, Clock01Icon, Image02Icon, Mic01Icon, Pdf02Icon, SentIcon } from "@hugeicons/core-free-icons";
+import Icon, { huge } from "@/components/dashboard/Icon";
+import { initialChats, type ChatMessage } from "@/lib/projectScreens";
+import { CURRENT_USER } from "@/lib/workspaceDoc";
+
+const ago = (iso: string, now: number) => {
+  const m = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+};
+
+function Avatar({ name, src }: { name: string; src?: string }) {
+  if (src) return <Image src={src} alt="" width={18} height={18} className="size-[18px] shrink-0 rounded-full" />;
+  return (
+    <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-blue/10 text-[9px] font-semibold text-blue">
+      {name[0]}
+    </span>
+  );
+}
+
+/** Figma "Project Chats": message bubbles (#FAFAFA, border #EDEDF0, radius 12), own messages on the right,
+ *  composer "Write Here" with attach, mic and send. Messages are kept in this browser. */
+export default function ProjectChat({ storageKey }: { storageKey: string }) {
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<string[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  const listRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const loaded = useRef(false);
+
+  /* load after mount (times depend on the clock, so never render them on the server) */
+  useEffect(() => {
+    let list: ChatMessage[] | null = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) list = JSON.parse(raw);
+    } catch {
+      /* ignore damaged data */
+    }
+    setMsgs(Array.isArray(list) ? list : initialChats());
+    loaded.current = true;
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [storageKey]);
+
+  /* keep the newest message in view */
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: loaded.current ? "smooth" : "auto" });
+  }, [msgs.length]);
+
+  const send = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const body = text.trim();
+    if (!body && !files.length) return;
+    const msg: ChatMessage = {
+      id: `m${Date.now()}`,
+      author: CURRENT_USER.name,
+      avatar: CURRENT_USER.avatar,
+      text: body,
+      at: new Date().toISOString(),
+      files: files.length ? files : undefined,
+      mine: true,
+    };
+    const next = [...msgs, msg];
+    setMsgs(next);
+    setNow(Date.now());
+    setText("");
+    setFiles([]);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      /* storage full */
+    }
+  };
+
+  return (
+    <section className="flex h-[calc(100dvh-200px)] min-h-[520px] w-full max-w-[885px] flex-col rounded-[20px] border border-[#EDEDF0] bg-white">
+      <div ref={listRef} className="chat-scroll mr-2 my-2 flex flex-1 flex-col gap-5 overflow-y-auto p-3 pr-4" aria-live="polite">
+        {msgs.map((m) => (
+          <div
+            key={m.id}
+            className={`flex max-w-[85%] flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] px-3 py-2.5 sm:max-w-[70%] ${
+              m.mine ? "self-end" : "self-start"
+            }`}
+          >
+            {m.files && (
+              <div className="flex flex-wrap gap-2">
+                {m.files.map((f) => (
+                  <span
+                    key={f}
+                    title={f}
+                    className="flex size-9 items-center justify-center rounded-lg border border-[#EDEDF0] bg-white text-[#101D37]"
+                  >
+                    <Icon icon={huge(/\.pdf$/i.test(f) ? Pdf02Icon : Image02Icon)} size={16} stroke={1.4} />
+                  </span>
+                ))}
+              </div>
+            )}
+            {m.text && <p className="text-xs leading-[1.6] tracking-[-0.02em] break-words text-[#101D37]">{m.text}</p>}
+            <div className="flex items-center gap-1.5 text-[11px] text-body">
+              <Avatar name={m.author} src={m.avatar} />
+              <span className="text-xs font-semibold text-[#101D37]">{m.mine ? "You" : m.author}</span>
+              <Icon icon={huge(Clock01Icon)} size={11} stroke={1.4} className="ml-1" />
+              <span>{ago(m.at, now)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={send} className="m-4 mt-0 flex flex-col gap-2 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-2.5">
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {files.map((f, i) => (
+              <span key={`${f}-${i}`} className="flex h-7 max-w-[200px] items-center gap-1.5 rounded-lg border border-[#EDEDF0] bg-white px-2 text-[11px] text-[#242C2C]">
+                <span className="truncate">{f}</span>
+                <button type="button" aria-label={`Remove ${f}`} onClick={() => setFiles((all) => all.filter((_, j) => j !== i))} className="text-body">
+                  <Icon icon={huge(Cancel01Icon)} size={12} stroke={1.4} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <button type="button" aria-label="Attach files" onClick={() => fileRef.current?.click()} className="flex size-8 shrink-0 items-center justify-center text-body hover:text-[#101D37]">
+            <Icon icon={huge(Add01Icon)} size={16} stroke={1.4} />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            accept="image/*,application/pdf"
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []).map((f) => f.name);
+              setFiles((all) => [...all, ...picked]);
+              e.target.value = "";
+            }}
+          />
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Write Here"
+            aria-label="Message"
+            className="h-9 min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
+          />
+          <button
+            type="button"
+            aria-label="Voice message (coming soon)"
+            title="Voice messages are coming soon"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#EDEDF0] bg-white text-body"
+          >
+            <Icon icon={huge(Mic01Icon)} size={15} stroke={1.4} />
+          </button>
+          <button
+            type="submit"
+            aria-label="Send"
+            disabled={!text.trim() && !files.length}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue text-white disabled:opacity-40"
+          >
+            <Icon icon={huge(SentIcon)} size={15} stroke={1.5} />
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}

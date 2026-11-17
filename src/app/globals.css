@@ -27,6 +27,56 @@ body {
   color: var(--color-dark);
 }
 
+/* Browser autofill: keep the field's own transparent/white look instead of the blue tint */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
+  box-shadow: 0 0 0 1000px #fff inset !important;
+  -webkit-text-fill-color: #101d37 !important;
+  caret-color: #101d37;
+  transition: background-color 9999s ease-in-out 0s;
+}
+input:autofill {
+  background-color: transparent !important;
+}
+
+/* ---------- Syncfusion document editor, themed to the app (Figma blue + Inter) ----------
+ * Set on body so the variables also reach Syncfusion's popups and dialogs. */
+body {
+  --e-font-name: var(--font-inter), "Inter", system-ui, sans-serif;
+  --color-sf-primary: #285ce0;
+  --color-sf-primary-bg-color: #285ce0;
+  --color-sf-primary-border-color: #285ce0;
+  --color-sf-primary-light: #5b83ea;
+  --color-sf-primary-lighter: rgba(40, 92, 224, 0.1);
+  --color-sf-primary-dark: #1f4bbd;
+  --color-sf-primary-darker: #183c97;
+  --color-sf-border-light: #ededf0;
+  --color-sf-border: #e4e7ec;
+}
+.doc-editor-host .e-de-background {
+  background-color: #f5f9ff !important;
+}
+.doc-editor-host .e-ribbon {
+  border-bottom: 1px solid #ededf0;
+}
+.doc-editor-host .e-ribbon .e-tab-header .e-toolbar-item .e-tab-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #667085;
+}
+.doc-editor-host .e-ribbon .e-tab-header .e-toolbar-item.e-active .e-tab-text {
+  color: #285ce0;
+}
+.doc-editor-host .e-ribbon .e-ribbon-group-header {
+  font-size: 11px;
+  color: #98a2b3;
+}
+
 
 /* ---------- Workspace document editor (Figma "A4 - 1") ---------- */
 .doc-editor {
@@ -82,3 +132,20 @@ body {
   pointer-events: none;
 }
 .doc-editor ::selection { background: rgba(40, 92, 224, 0.18); }
+
+/* Figma "Project Chats": thin blue scrollbar on a light track */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #285ce0 #f2f4f7;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: #f2f4f7;
+  border-radius: 4px;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #285ce0;
+  border-radius: 4px;
+}

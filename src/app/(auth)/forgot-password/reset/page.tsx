@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockIcon } from "@/components/icons";
 import {
@@ -12,6 +13,7 @@ import {
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const [mismatch, setMismatch] = useState(false);
 
   return (
     <div className="flex w-full max-w-[412px] flex-col gap-6">
@@ -30,6 +32,11 @@ export default function ChangePasswordPage() {
         className="flex flex-col gap-6"
         onSubmit={(e) => {
           e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          if (f.get("new-password") !== f.get("repeat-password")) {
+            setMismatch(true);
+            return;
+          }
           router.push("/login");
         }}
       >
@@ -40,6 +47,9 @@ export default function ChangePasswordPage() {
             type="password"
             placeholder="••••••••••"
             autoComplete="new-password"
+            name="new-password"
+            minLength={8}
+            onChange={() => setMismatch(false)}
           />
           <Field
             label="Repeat password"
@@ -47,7 +57,14 @@ export default function ChangePasswordPage() {
             type="password"
             placeholder="••••••••••"
             autoComplete="new-password"
+            name="repeat-password"
+            onChange={() => setMismatch(false)}
           />
+          {mismatch && (
+            <p role="alert" className="-mt-3 text-xs text-[#FF2020]">
+              Passwords do not match.
+            </p>
+          )}
         </div>
         <Checkbox id="terms">
           <TermsLabel />

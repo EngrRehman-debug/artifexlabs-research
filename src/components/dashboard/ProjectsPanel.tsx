@@ -5,11 +5,15 @@ import { useState } from "react";
 import { Folder } from "@untitledui/icons";
 import {
   Add01Icon,
+  BubbleChatIcon,
+  CheckmarkBadge01Icon,
   Search01Icon,
   UserGroupIcon,
+  WorkflowSquare03Icon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge, untitled } from "./Icon";
-import { PANEL_WORK_PACKAGES, PROJECTS } from "@/lib/projects";
+import { PANEL_WORK_PACKAGES } from "@/lib/projects";
+import { useAllProjects } from "@/lib/createdProjects";
 
 /**
  * Figma "Group 3": secondary panel, 215 wide, white, right border #EDEDF0.
@@ -28,20 +32,32 @@ const WP_SECTIONS = [
   { key: "reports", label: "Reports" },
 ] as const;
 
+/** project-level screens (Departments, Baseline, Teams, Chats) */
+export type ProjectPage = "departments" | "baseline" | "teams" | "chats";
+const PROJECT_PAGES: { key: ProjectPage; label: string; icon: typeof Add01Icon }[] = [
+  { key: "departments", label: "Departments & Workstreams", icon: WorkflowSquare03Icon },
+  { key: "baseline", label: "Baseline & Approvals", icon: CheckmarkBadge01Icon },
+  { key: "teams", label: "Project Teams", icon: UserGroupIcon },
+  { key: "chats", label: "Project Chats", icon: BubbleChatIcon },
+];
+
 export default function ProjectsPanel({
   activeSlug,
   newLabel = "New Research Study",
   showWorkPackages = false,
   activeSection,
+  activePage,
 }: {
   activeSlug?: string;
   newLabel?: string;
   showWorkPackages?: boolean;
   /** Workspace frame: expands "Storage Technology" with its sections */
-  activeSection?: "overview" | "workspace";
+  activeSection?: "overview" | "workspace" | "evidence";
+  activePage?: ProjectPage;
 }) {
   const [query, setQuery] = useState("");
-  const list = PROJECTS.filter((p) =>
+  const all = useAllProjects();
+  const list = all.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase()),
   );
 
@@ -52,7 +68,7 @@ export default function ProjectsPanel({
           Total Projects
         </h2>
         <span className="pr-0.5 text-base leading-[1.5] font-semibold tracking-[-0.02em] text-blue">
-          {PROJECTS.length}
+          {all.length}
         </span>
       </div>
 
@@ -116,8 +132,8 @@ export default function ProjectsPanel({
                       const href =
                         sec.key === "overview"
                           ? `/projects/${activeSlug}`
-                          : sec.key === "workspace"
-                            ? `/projects/${activeSlug}/workspace`
+                          : sec.key === "workspace" || sec.key === "evidence"
+                            ? `/projects/${activeSlug}/${sec.key}`
                             : "#";
                       const on = sec.key === activeSection;
                       return (
@@ -154,6 +170,31 @@ export default function ProjectsPanel({
             Teams &amp; Timeline
           </Link>
         </div>
+      )}
+
+      {activeSlug && (
+        <nav aria-label="Project" className="-mx-4 flex flex-col border-t border-[#EDEDF0] px-4 pt-5 pb-6">
+          <h3 className="text-base leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">Project</h3>
+          <ul className="mt-4 flex w-[186px] flex-col gap-[14px]">
+            {PROJECT_PAGES.map((pg) => {
+              const on = pg.key === activePage;
+              return (
+                <li key={pg.key}>
+                  <Link
+                    href={`/projects/${activeSlug}/${pg.key}`}
+                    aria-current={on ? "page" : undefined}
+                    className={`flex items-center gap-2 text-xs leading-[1.5] tracking-[-0.02em] hover:text-[#101D37] ${
+                      on ? "font-semibold text-[#101D37]" : "text-body"
+                    }`}
+                  >
+                    <Icon icon={huge(pg.icon)} size={13} stroke={1.1} className="shrink-0" />
+                    <span className="truncate">{pg.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       )}
     </aside>
   );

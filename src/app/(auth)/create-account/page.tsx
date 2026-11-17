@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LockIcon, MailIcon, UserIcon } from "@/components/icons";
 import {
   DashedLine,
@@ -11,6 +12,7 @@ import {
 } from "@/components/auth/ui";
 
 export default function CreateAccountPage() {
+  const router = useRouter();
   return (
     <div className="flex w-full max-w-[371px] flex-col gap-6">
       <div className="flex flex-col gap-1 text-center">
@@ -26,7 +28,10 @@ export default function CreateAccountPage() {
 
       <form
         className="flex flex-col gap-6"
-        onSubmit={(e) => e.preventDefault()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          router.push("/home");
+        }}
       >
         <div className="flex flex-col gap-4">
           <Field
@@ -49,6 +54,7 @@ export default function CreateAccountPage() {
             type="password"
             placeholder="••••••••••"
             autoComplete="new-password"
+            minLength={8}
           />
         </div>
 
