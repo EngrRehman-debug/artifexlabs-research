@@ -207,3 +207,18 @@ button:disabled,
   outline: 2px solid rgba(40, 92, 224, 0.55);
   outline-offset: 2px;
 }
+
+/* Syncfusion ribbon "File" button: replace the 3px dark focus box with the app's soft focus ring */
+.doc-editor-host .e-ribbon .e-ribbon-file-menu,
+.doc-editor-host .e-ribbon .e-ribbon-file-menu:focus {
+  outline: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 6px;
+}
+.doc-editor-host .e-ribbon .e-ribbon-file-menu:hover {
+  background-color: #f2f4f7 !important;
+}
+.doc-editor-host .e-ribbon .e-ribbon-file-menu:focus-visible {
+  box-shadow: 0 0 0 2px rgba(40, 92, 224, 0.35) !important;
+}
