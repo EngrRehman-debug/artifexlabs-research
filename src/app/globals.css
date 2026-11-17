@@ -149,3 +149,61 @@ body {
   background: #285ce0;
   border-radius: 4px;
 }
+
+/* ---------- Interaction states (Figma has no hover frames – consistent app-wide defaults) ----------
+ * Unlayered so they beat Tailwind's base reset, but every hover rule skips elements that
+ * already declare their own `hover:` utility. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="radio"],
+summary,
+select,
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+input[type="date"] {
+  cursor: pointer;
+}
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+:is(a[href], button) {
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* primary (blue) buttons and links: a shade darker */
+:is(a[href], button:not(:disabled)).bg-blue:not([class*="hover:"]):hover {
+  background-color: #1f4fcb;
+}
+:is(a[href], button:not(:disabled)).bg-blue:not([class*="hover:"]):active {
+  background-color: #1a43ad;
+}
+
+/* outlined (#EDEDF0) buttons and links: darker border, faint fill */
+:is(a[href], button:not(:disabled)):is(.border-\[\#EDEDF0\], .border-\[\#ededf0\]):not([class*="hover:"]):hover {
+  border-color: #d0d5dd;
+  background-color: #f9fafb;
+}
+
+/* text-only blue links/buttons: darker blue */
+:is(a[href], button:not(:disabled)).text-blue:not([class*="bg-"]):not([class*="hover:"]):hover {
+  color: #1f4fcb;
+}
+
+/* grey text-only buttons/links: turn dark */
+:is(a[href], button:not(:disabled)).text-body:not([class*="bg-"]):not([class*="border"]):not([class*="hover:"]):hover {
+  color: #101d37;
+}
+
+/* keyboard focus */
+:is(a[href], button):focus-visible {
+  outline: 2px solid rgba(40, 92, 224, 0.55);
+  outline-offset: 2px;
+}

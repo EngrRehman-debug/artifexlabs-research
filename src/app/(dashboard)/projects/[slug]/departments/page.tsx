@@ -4,7 +4,7 @@ import { SearchList01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { huge } from "@/components/dashboard/Icon";
 import ProjectShell from "@/components/projects/ProjectShell";
 import DetailRows, { SectionTitle } from "@/components/projects/DetailRows";
-import { PROJECTS, getProject } from "@/lib/projects";
+import { PROJECTS, isProjectSlug } from "@/lib/projects";
 import { HANDOFFS, INITIATIVES, STATE_STYLE, WORKSTREAM_MATRIX } from "@/lib/projectScreens";
 
 export function generateStaticParams() {
@@ -17,7 +17,7 @@ const GRID = "grid grid-cols-[minmax(0,390.6fr)_minmax(0,321fr)_101px] items-cen
 /** Figma frame "Departments & Workstreams". */
 export default async function DepartmentsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!getProject(slug)) notFound();
+  if (!isProjectSlug(slug)) notFound();
 
   return (
     <ProjectShell

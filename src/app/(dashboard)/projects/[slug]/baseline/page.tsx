@@ -4,7 +4,7 @@ import { huge } from "@/components/dashboard/Icon";
 import ProjectShell from "@/components/projects/ProjectShell";
 import DetailRows, { SectionTitle } from "@/components/projects/DetailRows";
 import ReviewChecker from "@/components/projects/ReviewChecker";
-import { PROJECTS, getProject } from "@/lib/projects";
+import { PROJECTS, isProjectSlug } from "@/lib/projects";
 import { BASELINE_SUMMARY } from "@/lib/projectScreens";
 
 export function generateStaticParams() {
@@ -14,7 +14,7 @@ export function generateStaticParams() {
 /** Figma frame "Project Baseline & Approvals". */
 export default async function BaselinePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!getProject(slug)) notFound();
+  if (!isProjectSlug(slug)) notFound();
 
   /* Decision Record: the approved baselines of the projects (Figma lists the sample projects) */
   const decisions = PROJECTS.slice(0, 3).map((p) => ({ title: p.name, href: `/projects/${p.slug}` }));

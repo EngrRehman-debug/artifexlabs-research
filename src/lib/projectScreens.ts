@@ -69,8 +69,8 @@ export const TEAM_MEMBERS: Member[] = [
   { name: "Alina Khan", designation: "Senior UX Designer", department: "Product Design", updated: "15 Nov 2026", email: "alina@artifexlabs.com" },
   { name: "Omar Patel", designation: "Engineering Manager", department: "Engineering", updated: "15 Nov 2026", email: "omar@artifexlabs.com", avatar: "/images/avatar-omar.png" },
   { name: "Sarah Chen", designation: "Research Scientist", department: "Research", updated: "14 Nov 2026", email: "sarah@artifexlabs.com" },
-  { name: "Chelsea Lee", designation: "Commercial Analyst", department: "Commercial", updated: "14 Nov 2026", email: "chelsea@artifexlabs.com" },
-  { name: "Alan Reed", designation: "Quality Lead", department: "Quality", updated: "13 Nov 2026", email: "alan@artifexlabs.com" },
+  { name: "Chelsea Lee", designation: "Commercial Analyst", department: "Commercial", updated: "14 Nov 2026", email: "chelsea@artifexlabs.com", avatar: "/images/avatar-chelsea.png" },
+  { name: "Alan Reed", designation: "Quality Lead", department: "Quality", updated: "13 Nov 2026", email: "alan@artifexlabs.com", avatar: "/images/avatar-alan.png" },
   { name: "Ayesha Tariq", designation: "HR Partner", department: "Human Resources", updated: "12 Nov 2026", email: "ayesha@artifexlabs.com" },
   { name: "Hamza Ali", designation: "Finance Controller", department: "Finance", updated: "11 Nov 2026", email: "hamza@artifexlabs.com" },
   { name: "Maria Lopez", designation: "Procurement Lead", department: "Procurement", updated: "10 Nov 2026", email: "maria@artifexlabs.com" },
@@ -95,11 +95,11 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 
 export const initialChats = (): ChatMessage[] => [
   { id: "m1", author: "Omar", avatar: "/images/avatar-omar.png", text: "Site survey is booked for Thursday — I'll share the heat-loss readings after.", at: ago(10) },
-  { id: "m2", author: "Chelsea", text: "Heat recovery — integrated feasibility study · Problem and measurement protocol", at: ago(6) },
-  { id: "m3", author: "Chelsea", text: "Heat recovery — integrated feasibility study · Signal register and assessment", at: ago(5) },
-  { id: "m4", author: "Chelsea", text: "Heat recovery — integrated feasibility study · Financial model and risk notes", at: ago(5) },
+  { id: "m2", author: "Chelsea", avatar: "/images/avatar-chelsea.png", text: "Heat recovery — integrated feasibility study · Problem and measurement protocol", at: ago(6) },
+  { id: "m3", author: "Chelsea", avatar: "/images/avatar-chelsea.png", text: "Heat recovery — integrated feasibility study · Signal register and assessment", at: ago(5) },
+  { id: "m4", author: "Chelsea", avatar: "/images/avatar-chelsea.png", text: "Heat recovery — integrated feasibility study · Financial model and risk notes", at: ago(5) },
   { id: "m5", author: "Omar", avatar: "/images/avatar-omar.png", text: "Thanks — I'll review the protocol today.", at: ago(4) },
-  { id: "m6", author: "Chelsea", text: "Heat recovery — integrated feasibility study · Problem and measurement protocol", at: ago(2) },
+  { id: "m6", author: "Chelsea", avatar: "/images/avatar-chelsea.png", text: "Heat recovery — integrated feasibility study · Problem and measurement protocol", at: ago(2) },
   { id: "m7", author: "Ibrahim Ghatila", avatar: "/images/avatar-ibrahim.png", text: "Quality checklist and the supplier datasheet are attached.", at: ago(2), files: ["checklist.png", "datasheet.pdf"], mine: true },
-  { id: "m8", author: "Chelsea", text: "Got it, adding both to the evidence ledger.", at: ago(1) },
+  { id: "m8", author: "Chelsea", avatar: "/images/avatar-chelsea.png", text: "Got it, adding both to the evidence ledger.", at: ago(1) },
 ];

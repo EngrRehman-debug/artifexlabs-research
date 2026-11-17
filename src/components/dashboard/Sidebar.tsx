@@ -139,7 +139,7 @@ export default function Sidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex size-5 items-center justify-center text-white"
+            className="flex size-5 items-center justify-center rounded text-white hover:opacity-75"
           >
             <Icon
               icon={untitled(ChevronLeftDouble)}
@@ -218,7 +218,7 @@ export default function Sidebar({
             <Link
               href="/login"
               aria-label="Log out"
-              className="pr-2 text-white"
+              className="pr-2 text-white hover:opacity-75"
             >
               <Icon icon={untitled(LogOut01)} size={20} />
             </Link>

@@ -121,7 +121,7 @@ export function BackButton({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="flex h-9 w-fit items-center gap-1.5 py-2 pr-3 text-sm leading-5 font-medium tracking-[-0.02em] text-dark"
+      className="flex h-9 w-fit items-center gap-1.5 py-2 pr-3 text-sm leading-5 font-medium tracking-[-0.02em] text-dark hover:text-blue"
     >
       <ChevronLeftIcon className="size-4" />
       Back
@@ -136,7 +136,7 @@ export function TermsLabel() {
       I accept the{" "}
       <Link
         href="#"
-        className="font-semibold text-dark underline underline-offset-2"
+        className="font-semibold text-dark underline underline-offset-2 hover:text-blue"
       >
         Terms and Conditions
       </Link>

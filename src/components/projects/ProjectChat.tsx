@@ -17,7 +17,7 @@ const ago = (iso: string, now: number) => {
 };
 
 function Avatar({ name, src }: { name: string; src?: string }) {
-  if (src) return <Image src={src} alt="" width={18} height={18} className="size-[18px] shrink-0 rounded-full" />;
+  if (src) return <Image src={src} alt="" width={36} height={36} className="size-[18px] shrink-0 rounded-full object-cover" />;
   return (
     <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-blue/10 text-[9px] font-semibold text-blue">
       {name[0]}
@@ -25,7 +25,8 @@ function Avatar({ name, src }: { name: string; src?: string }) {
   );
 }
 
-/** Figma "Project Chats": message bubbles (#FAFAFA, border #EDEDF0, radius 12), own messages on the right,
+/** Figma "Project Chats" (card 885 wide, radius 16, padding 16; list and composer 30 apart;
+ *  height = viewport − top bar 64 − padding 40/64 − title 36 − gap 20, so the page itself never scrolls): message bubbles (#FAFAFA, border #EDEDF0, radius 12), own messages on the right,
  *  composer "Write Here" with attach, mic and send. Messages are kept in this browser. */
 export default function ProjectChat({ storageKey }: { storageKey: string }) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
@@ -83,12 +84,12 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
   };
 
   return (
-    <section className="flex h-[calc(100dvh-200px)] min-h-[520px] w-full max-w-[885px] flex-col rounded-[20px] border border-[#EDEDF0] bg-white">
-      <div ref={listRef} className="chat-scroll mr-2 my-2 flex flex-1 flex-col gap-5 overflow-y-auto p-3 pr-4" aria-live="polite">
+    <section className="flex h-[calc(100dvh-224px)] min-h-[480px] w-full max-w-[885px] flex-col gap-[30px] rounded-2xl border border-[#EDEDF0] bg-white p-4">
+      <div ref={listRef} className="chat-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2.5" aria-live="polite">
         {msgs.map((m) => (
           <div
             key={m.id}
-            className={`flex max-w-[85%] flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] px-3 py-2.5 sm:max-w-[70%] ${
+            className={`flex max-w-[85%] flex-col gap-2.5 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] px-2.5 py-2 sm:max-w-[70%] ${
               m.mine ? "self-end" : "self-start"
             }`}
           >
@@ -105,18 +106,22 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
                 ))}
               </div>
             )}
-            {m.text && <p className="text-xs leading-[1.6] tracking-[-0.02em] break-words text-[#101D37]">{m.text}</p>}
-            <div className="flex items-center gap-1.5 text-[11px] text-body">
-              <Avatar name={m.author} src={m.avatar} />
-              <span className="text-xs font-semibold text-[#101D37]">{m.mine ? "You" : m.author}</span>
-              <Icon icon={huge(Clock01Icon)} size={11} stroke={1.4} className="ml-1" />
-              <span>{ago(m.at, now)}</span>
+            {m.text && <p className="text-xs leading-[1.5] tracking-[-0.02em] break-words text-[#101D37]">{m.text}</p>}
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center gap-1">
+                <Avatar name={m.author} src={m.avatar} />
+                <span className="text-xs leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">{m.mine ? "You" : m.author}</span>
+              </span>
+              <span className="flex items-center gap-1 text-[10px] leading-[1.5] tracking-[-0.02em] text-body">
+                <Icon icon={huge(Clock01Icon)} size={12} stroke={1.4} />
+                {ago(m.at, now)}
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      <form onSubmit={send} className="m-4 mt-0 flex flex-col gap-2 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-2.5">
+      <form onSubmit={send} className="flex shrink-0 flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] p-2.5">
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1">
             {files.map((f, i) => (

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import TopBar from "@/components/dashboard/TopBar";
 import ProjectsPanel from "@/components/dashboard/ProjectsPanel";
 import EvidenceLedger from "@/components/evidence/EvidenceLedger";
-import { PROJECTS, getProject } from "@/lib/projects";
+import { PROJECTS, isProjectSlug } from "@/lib/projects";
 
 export function generateStaticParams() {
   return PROJECTS.map((p) => ({ slug: p.slug }));
@@ -11,7 +11,7 @@ export function generateStaticParams() {
 /** Figma "Projects - Workspace" frame → "Evidence Extraction Ledger". */
 export default async function EvidencePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!getProject(slug)) notFound();
+  if (!isProjectSlug(slug)) notFound();
 
   return (
     <div className="flex min-w-0 flex-1">

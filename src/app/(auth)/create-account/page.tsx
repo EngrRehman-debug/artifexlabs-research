@@ -66,7 +66,7 @@ export default function CreateAccountPage() {
 
       <p className="text-center text-sm leading-[1.5] font-medium text-dark">
         Do you have an account?{" "}
-        <Link href="/login" className="font-semibold">
+        <Link href="/login" className="font-semibold underline-offset-2 hover:text-blue hover:underline">
           Login
         </Link>
       </p>

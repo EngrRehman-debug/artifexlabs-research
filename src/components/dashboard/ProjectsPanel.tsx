@@ -19,7 +19,7 @@ import { useAllProjects } from "@/lib/createdProjects";
  * Figma "Group 3": secondary panel, 215 wide, white, right border #EDEDF0.
  *  - "Total Projects" Inter 600 16 #101D37 + count #285CE0, top 20
  *  - search 183 x 40, radius 6, #FAFAFA, top 82
- *  - project list (Inter 12, #667085, gap 20) at top 142; active item 600 #101D37
+ *  - project list (Inter 12, #667085, gap 10 + divider lines) at top 147; active item 600 #101D37
  *  - "+ New …" link Inter 500 12 #285CE0
  *  - Overview frame only: "Work Packages" section (Inter 600 16) with sub items
  */
@@ -83,11 +83,13 @@ export default function ProjectsPanel({
         />
       </label>
 
-      <ul className="mt-5 flex w-[186px] flex-col gap-5">
-        {list.map((p) => {
+      {/* Figma Frame 2147232135: top 147, 186 wide, gap 10, 1px #EDEDF0 line between items */}
+      <ul className="mt-[25px] flex w-[186px] flex-col gap-[10px]">
+        {list.map((p, i) => {
           const active = p.slug === activeSlug;
           return (
-            <li key={p.slug}>
+            <li key={p.slug} className="flex flex-col gap-[10px]">
+              {i > 0 && <div className="h-px w-full bg-[#EDEDF0]" />}
               <Link
                 href={`/projects/${p.slug}`}
                 className={`flex items-center gap-2 text-xs leading-[1.5] tracking-[-0.02em] hover:text-[#101D37] ${
@@ -117,7 +119,8 @@ export default function ProjectsPanel({
           </h3>
           <ul className="mt-5 flex w-[186px] flex-col gap-[10px]">
             {PANEL_WORK_PACKAGES.map((wp, i) => (
-              <li key={wp}>
+              <li key={wp} className="flex flex-col gap-[10px]">
+                {i > 0 && <div className="h-px w-full bg-[#EDEDF0]" />}
                 <Link
                   href={i === 0 && activeSlug ? `/projects/${activeSlug}/workspace` : "#"}
                   className="flex items-center gap-2 text-xs leading-[1.5] tracking-[-0.02em] text-body hover:text-[#101D37]"
@@ -175,11 +178,12 @@ export default function ProjectsPanel({
       {activeSlug && (
         <nav aria-label="Project" className="-mx-4 flex flex-col border-t border-[#EDEDF0] px-4 pt-5 pb-6">
           <h3 className="text-base leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">Project</h3>
-          <ul className="mt-4 flex w-[186px] flex-col gap-[14px]">
-            {PROJECT_PAGES.map((pg) => {
+          <ul className="mt-5 flex w-[186px] flex-col gap-[10px]">
+            {PROJECT_PAGES.map((pg, i) => {
               const on = pg.key === activePage;
               return (
-                <li key={pg.key}>
+                <li key={pg.key} className="flex flex-col gap-[10px]">
+                  {i > 0 && <div className="h-px w-full bg-[#EDEDF0]" />}
                   <Link
                     href={`/projects/${activeSlug}/${pg.key}`}
                     aria-current={on ? "page" : undefined}

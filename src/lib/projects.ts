@@ -58,6 +58,11 @@ export const PROJECTS: Project[] = [
 
 export const getProject = (slug: string) => PROJECTS.find((p) => p.slug === slug);
 
+/** Sample projects, plus projects created in the New Project chat ("new-p<timestamp>").
+ *  Those live only in the browser, so the server can't look them up – their pages render
+ *  and the client fills in (or reports) the project. */
+export const isProjectSlug = (slug: string) => !!getProject(slug) || /^new-p\d+$/.test(slug);
+
 /* Sample content from the Figma "Projects - Hydrogen Energy Feasibility" frame */
 export const PANEL_WORK_PACKAGES = [
   "Storage Technology",

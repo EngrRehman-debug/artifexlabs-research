@@ -98,7 +98,7 @@ export default function VerifyCodePage() {
             type="button"
             disabled={seconds > 0}
             onClick={() => setSeconds(30)}
-            className="font-semibold text-dark underline underline-offset-2 disabled:cursor-default"
+            className="font-semibold text-dark underline underline-offset-2 enabled:hover:text-blue disabled:cursor-default disabled:opacity-60"
           >
             {seconds > 0
               ? `Resend in 00:${String(seconds).padStart(2, "0")}`
