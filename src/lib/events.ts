@@ -22,21 +22,23 @@ export const STATUS_STYLE: Record<EventStatus, { pill: string; bar: string }> = 
   Ended: { pill: "bg-[#FF6720]/10 text-[#FF6720]", bar: "#667085" },
 };
 
-/* Sample events from the Figma "Calendar" / "Kanban Calendar" frames (July 2025) */
+/* Sample events from the Figma "Calendar" / "Kanban Calendar" frames.
+ * July 2025 shows exactly the six cards of the Figma month view (same weekday
+ * positions); the other Kanban cards sit in June / August so the month stays clean. */
 export const INITIAL_EVENTS: CalEvent[] = [
   { id: "e1", title: "Commercial Viability — Lead Review", start: "2025-07-03", end: "2025-07-03", status: "Draft", progress: 42, more: 6 },
   { id: "e2", title: "Storage Technology Review", start: "2025-07-08", end: "2025-07-08", status: "Draft", progress: 42, more: 6 },
-  { id: "e3", title: "Regulatory Assessment Draft", start: "2025-07-15", end: "2025-07-16", status: "Active", progress: 42, more: 6 },
-  { id: "e4", title: "Partner Evidence Discussion", start: "2025-07-19", end: "2025-07-20", status: "Active", progress: 42, more: 6 },
+  { id: "e3", title: "Regulatory Assessment Draft", start: "2025-07-14", end: "2025-07-15", status: "Active", progress: 42, more: 6 },
+  { id: "e4", title: "Partner Evidence Discussion", start: "2025-07-18", end: "2025-07-19", status: "Active", progress: 42, more: 6 },
   { id: "e5", title: "Partner Evidence Discussion", start: "2025-07-24", end: "2025-07-25", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e6", title: "Sensor Findings Review", start: "2025-07-29", end: "2025-07-29", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e7", title: "Commercial Viability — Lead Assessment", start: "2025-07-10", end: "2025-07-10", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e8", title: "Hydrogen Supply Signals Check", start: "2025-07-22", end: "2025-07-22", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e9", title: "Cost Model Review", start: "2025-07-31", end: "2025-07-31", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e10", title: "Safety Requirements Workshop", start: "2025-07-17", end: "2025-07-17", status: "Scheduled", progress: 42, more: 6 },
-  { id: "e11", title: "Baseline Approval Meeting", start: "2025-07-11", end: "2025-07-11", status: "Active", progress: 42, more: 6 },
-  { id: "e12", title: "Kick-off: Heat Recovery Pilot", start: "2025-07-01", end: "2025-07-01", status: "Ended", progress: 42, more: 6 },
-  { id: "e13", title: "Stakeholder Interviews", start: "2025-07-02", end: "2025-07-02", status: "Ended", progress: 42, more: 6 },
+  { id: "e6", title: "Sensor Findings Review", start: "2025-07-28", end: "2025-07-28", status: "Scheduled", progress: 42, more: 6 },
+  { id: "e7", title: "Commercial Viability — Lead Assessment", start: "2025-08-05", end: "2025-08-05", status: "Scheduled", progress: 42, more: 6 },
+  { id: "e8", title: "Hydrogen Supply Signals Check", start: "2025-08-12", end: "2025-08-12", status: "Scheduled", progress: 42, more: 6 },
+  { id: "e9", title: "Cost Model Review", start: "2025-08-20", end: "2025-08-21", status: "Scheduled", progress: 42, more: 6 },
+  { id: "e10", title: "Safety Requirements Workshop", start: "2025-08-07", end: "2025-08-07", status: "Scheduled", progress: 42, more: 6 },
+  { id: "e11", title: "Baseline Approval Meeting", start: "2025-08-14", end: "2025-08-14", status: "Active", progress: 42, more: 6 },
+  { id: "e12", title: "Kick-off: Heat Recovery Pilot", start: "2025-06-24", end: "2025-06-24", status: "Ended", progress: 42, more: 6 },
+  { id: "e13", title: "Stakeholder Interviews", start: "2025-06-26", end: "2025-06-27", status: "Ended", progress: 42, more: 6 },
 ];
 
 /* ---- date helpers (UTC-free, string based) ---- */

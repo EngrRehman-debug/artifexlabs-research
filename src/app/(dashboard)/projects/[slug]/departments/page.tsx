@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { SearchList01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import AvatarStack from "@/components/dashboard/AvatarStack";
 import { huge } from "@/components/dashboard/Icon";
 import ProjectShell from "@/components/projects/ProjectShell";
 import DetailRows, { SectionTitle } from "@/components/projects/DetailRows";
@@ -56,7 +56,7 @@ export default async function DepartmentsPage({ params }: { params: Promise<{ sl
               {INITIATIVES.map((r, i) => (
                 <div key={i} className={`${GRID} h-[50px] rounded-2xl border border-[#EDEDF0] bg-white px-4`}>
                   <div className="flex min-w-0 items-center gap-2">
-                    <Image src="/images/team-avatars.png" alt="Team members" width={64} height={39} className="h-5 w-[43px] shrink-0 object-contain object-left" />
+                    <AvatarStack size={20} />
                     <span className="truncate text-xs leading-[1.5] font-semibold tracking-[-0.02em] text-[#242C2C]">{r.record}</span>
                   </div>
                   <span className="truncate pr-3 text-xs leading-[1.5] tracking-[-0.02em] text-body">{r.details}</span>
