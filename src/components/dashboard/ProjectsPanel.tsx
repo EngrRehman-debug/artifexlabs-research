@@ -62,7 +62,7 @@ export default function ProjectsPanel({
   );
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[215px] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-[#EDEDF0] bg-white px-4 xl:flex">
+    <aside className="sticky top-0 hidden h-dvh w-[215px] shrink-0 min-[1600px]:w-[260px] flex-col overflow-x-hidden overflow-y-auto border-r border-[#EDEDF0] bg-white px-4 xl:flex">
       <div className="flex h-16 shrink-0 items-start justify-between pt-5">
         <h2 className="text-base leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">
           Total Projects

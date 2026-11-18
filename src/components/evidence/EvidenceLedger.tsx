@@ -124,7 +124,7 @@ function Status() {
 
 export default function EvidenceLedger() {
   return (
-    <section className="flex w-full max-w-[885px] flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
+    <section className="flex w-full flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
       <div className="flex flex-col gap-2.5">
         <H3>Evidence Table</H3>
         <Chart />

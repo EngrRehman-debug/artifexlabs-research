@@ -7,8 +7,12 @@ import Icon, { huge } from "@/components/dashboard/Icon";
 import { TEAM_MEMBERS, type Member } from "@/lib/projectScreens";
 
 const PAGE = 8;
-/* Figma columns (row 845 wide, padding 16): name 0–124, designation →262, department →401, last update →541, contact →693, profile 120 */
-const GRID = "grid grid-cols-[minmax(0,120fr)_minmax(0,134fr)_minmax(0,128fr)_minmax(0,118fr)_minmax(0,173fr)_120px] items-center";
+/* Figma columns (row 845 wide, padding 16): name 0–124, designation →262, department →401, last update →541, contact →693, profile 120.
+ * The table sizes to its own width (container query): below 820px (laptops with both side panels open)
+ * "Last Update" folds away and the buttons use short labels, so nothing is cut or scrolled sideways. */
+const GRID =
+  "grid items-center grid-cols-[minmax(0,140fr)_minmax(0,130fr)_minmax(0,115fr)_minmax(0,110fr)_84px] @min-[820px]:grid-cols-[minmax(0,120fr)_minmax(0,134fr)_minmax(0,128fr)_minmax(0,118fr)_minmax(0,173fr)_120px]";
+const WIDE_ONLY = "hidden @min-[820px]:inline";
 const inputCls =
   "h-9 w-full rounded-[10px] border border-[#EDEDF0] bg-white px-3 text-xs text-[#101D37] outline-none placeholder:text-body focus:border-blue";
 
@@ -82,7 +86,7 @@ export default function TeamTable({ storageKey }: { storageKey: string }) {
   };
 
   return (
-    <section className="flex w-full max-w-[885px] flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
+    <section className="flex w-full flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37]">Team Members</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -138,13 +142,13 @@ export default function TeamTable({ storageKey }: { storageKey: string }) {
         </form>
       )}
 
-      <div className="-mx-5 overflow-x-auto px-5">
-        <div className="flex min-w-[780px] flex-col gap-2.5">
+      <div className="@container -mx-5 overflow-x-auto px-5">
+        <div className="flex min-w-[560px] flex-col gap-2.5">
           <div className={`${GRID} px-4 text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]`}>
             <span>Full Name</span>
             <span>Designation</span>
             <span>Department</span>
-            <span>Last Update</span>
+            <span className={WIDE_ONLY}>Last Update</span>
             <span>Contact</span>
             <span>Full Profile</span>
           </div>
@@ -161,14 +165,16 @@ export default function TeamTable({ storageKey }: { storageKey: string }) {
               </div>
               <span title={m.designation} className="truncate pr-2 text-xs text-body">{m.designation}</span>
               <span title={m.department} className="truncate pr-2 text-xs text-body">{m.department}</span>
-              <span className="text-xs text-body">{m.updated}</span>
+              <span className={`${WIDE_ONLY} text-xs text-body`}>{m.updated}</span>
               {m.email ? (
                 <a
                   href={`mailto:${m.email}`}
                   title={`Contact ${m.name}`}
                   className="mr-2 flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg border border-[#EDEDF0] bg-white px-2 text-[11px] font-semibold text-[#101D37] hover:border-blue/40"
                 >
-                  <span className="truncate">Contact {m.name}</span>
+                  <span className="truncate">
+                    Contact<span className={WIDE_ONLY}> {m.name}</span>
+                  </span>
                   <Icon icon={huge(ArrowUpRight01Icon)} size={12} stroke={1.6} className="shrink-0" />
                 </a>
               ) : (
@@ -179,7 +185,7 @@ export default function TeamTable({ storageKey }: { storageKey: string }) {
                 onClick={() => setProfile(m)}
                 className="flex h-8 items-center justify-center gap-1 rounded-lg bg-blue px-2 text-[11px] font-semibold whitespace-nowrap text-white"
               >
-                View Full Profile
+                <span className={WIDE_ONLY}>View Full&nbsp;</span>Profile
                 <Icon icon={huge(ArrowUpRight01Icon)} size={12} stroke={1.6} />
               </button>
             </div>

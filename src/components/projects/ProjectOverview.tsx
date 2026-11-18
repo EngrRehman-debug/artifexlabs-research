@@ -49,7 +49,7 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
 
         <main className="px-4 pt-10 pb-16 sm:px-6 lg:px-10">
           {/* Figma: Frame 2147232172 – 885 wide at (515, 104), gap 20 */}
-          <div className="flex w-full max-w-[885px] flex-col gap-5">
+          <div className="flex w-full flex-col gap-5">
             <h1 className="text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-[30px]">
               <span className="text-blue">{project.title[0]}</span> {project.title[1]}
             </h1>
@@ -170,7 +170,7 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                 </ul>
 
                 <div className="-mx-5 hidden overflow-x-auto px-5 md:block">
-                  <div className="flex min-w-[700px] flex-col gap-[14px]">
+                  <div className="flex min-w-[600px] flex-col gap-[14px]">
                     <div
                       className={`${HEAD_GRID} text-sm leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37]`}
                     >

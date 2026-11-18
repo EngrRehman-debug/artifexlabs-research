@@ -35,7 +35,7 @@ export default function ProjectsPage() {
           </h1>
 
           {/* Card – Figma: 885 wide, radius 20, padding 20, border #EDEDF0 */}
-          <section className="flex w-full max-w-[885px] flex-col gap-[6.06px] rounded-[20px] border border-[#EDEDF0] bg-white p-5">
+          <section className="flex w-full flex-col gap-[6.06px] rounded-[20px] border border-[#EDEDF0] bg-white p-5">
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-xl">
                 Projects Research Initiatives
@@ -95,7 +95,7 @@ export default function ProjectsPage() {
             </ul>
 
             <div className="-mx-5 hidden overflow-x-auto px-5 md:block">
-              <div className="flex min-w-[760px] flex-col gap-5 pt-[13.94px]">
+              <div className="flex min-w-[640px] flex-col gap-5 pt-[13.94px]">
                 {/* Header */}
                 <div
                   className={`${HEAD_GRID} text-sm leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37]`}

@@ -84,7 +84,7 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
   };
 
   return (
-    <section className="flex h-[calc(100dvh-224px)] min-h-[480px] w-full max-w-[885px] flex-col gap-[30px] rounded-2xl border border-[#EDEDF0] bg-white p-4">
+    <section className="flex h-[calc(100dvh-224px)] min-h-[480px] w-full flex-col gap-[30px] rounded-2xl border border-[#EDEDF0] bg-white p-4">
       <div ref={listRef} className="chat-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2.5" aria-live="polite">
         {msgs.map((m) => (
           <div

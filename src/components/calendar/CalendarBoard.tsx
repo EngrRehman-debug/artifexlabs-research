@@ -787,7 +787,7 @@ export default function CalendarBoard() {
 
   return (
     /* Figma "Calender" card: 1100 wide, radius 12, padding 16, gap 16, white, border */
-    <section className="flex w-full max-w-[1100px] flex-col gap-4 rounded-xl border border-[#EDEDF0] bg-white p-4">
+    <section className="flex w-full flex-col gap-4 rounded-xl border border-[#EDEDF0] bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">
           Deadlines, Reviews, Meetings..

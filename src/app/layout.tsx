@@ -24,7 +24,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${jakarta.variable}`}>
-      <body className="font-sans antialiased">
+      {/* browser extensions (e.g. ColorZilla's cz-shortcut-listen) add attributes to <body> before hydration */}
+      <body className="font-sans antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

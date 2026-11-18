@@ -90,7 +90,7 @@ export default function PlanTimeline() {
   };
 
   return (
-    <section className="flex w-full max-w-[885px] flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
+    <section className="flex w-full flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5">
       {/* Tabs */}
       <div className="flex gap-6 border-b border-[#EDEDF0]" role="tablist">
         {TABS.map((t) => (
@@ -113,7 +113,7 @@ export default function PlanTimeline() {
 
       {/* Gantt */}
       <div className="-mx-5 overflow-x-auto px-5">
-        <div className="flex min-w-[700px] flex-col gap-2.5 rounded-2xl border border-[#EDEDF0] bg-white p-5">
+        <div className="flex min-w-[600px] flex-col gap-2.5 rounded-2xl border border-[#EDEDF0] bg-white p-5">
           {ROWS.map((r, i) => {
             const dim =
               (tab === "Critical Path" && !r.critical) || (focus !== null && focus !== i);

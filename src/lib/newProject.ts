@@ -43,11 +43,14 @@ export type Draft = {
   businessUnit: string;
   start: string;
   target: string;
+  /** business case / background for the scope */
+  background: string;
   inScope: string;
   outScope: string;
   deliverable: string;
   measures: string;
   assumptions: string;
+  dependencies: string;
   /* 02 Organization */
   sponsor: string;
   lead: string;
@@ -218,11 +221,13 @@ export const EMPTY_DRAFT: Draft = {
   businessUnit: "",
   start: "",
   target: "",
+  background: "",
   inScope: "",
   outScope: "",
   deliverable: "",
   measures: "",
   assumptions: "",
+  dependencies: "",
   sponsor: "Ibrahim Ghatila",
   lead: "Ibrahim Ghatila",
   departments: ["Research & Development"],
@@ -274,7 +279,9 @@ export function suggestName(prompt: string) {
     .replace(/^(the|a|an|whether|if|how)\s+/i, "")
     .trim();
   const STOP = /^(at|in|on|of|for|to|and|or|the|a|an|with|by|from|our|including|across)$/i;
-  const words = cleaned.split(/,|;| - /)[0].split(/\s+/).slice(0, 7);
+  /* keep the subject only: "hydrogen energy feasibility for industrial operations" -> "Hydrogen Energy Feasibility" */
+  const subject = cleaned.split(/,|;| - /)[0].split(/\s+(?:for|in|at|across|within|to)\s+/i)[0];
+  const words = subject.split(/\s+/).slice(0, 7);
   while (words.length > 1 && STOP.test(words[words.length - 1])) words.pop();
   const out = words.join(" ");
   return out ? titleCase(out) : "";
@@ -290,7 +297,7 @@ export function suggestFromPrompt(prompt: string): Partial<Draft> {
         ? "Technology Evaluation"
         : has(t, "validat", "prototype", "test", "engineer")
           ? "Engineering & Validation"
-          : has(t, "process", "operation", "rollout")
+          : has(t, "rollout", "process change", "adoption")
             ? "Operational Change"
             : "Research & Development";
 
@@ -306,14 +313,50 @@ export function suggestFromPrompt(prompt: string): Partial<Draft> {
   const workstreams = deps
     .filter((d) => WS_BY_DEPT[d])
     .slice(0, 1)
-    .map((d) => ({ ...emptyWorkstream(d), ...WS_BY_DEPT[d] }));
+    .map((d) => ({
+      ...emptyWorkstream(d),
+      ...WS_BY_DEPT[d],
+      team: teamsFor(d)[0],
+      owner: PEOPLE[0].name,
+      reviewer: PEOPLE[1].name,
+    }));
+
+  const regulated = has(t, "regulat", "safety", "complian", "certif");
+  const today = new Date();
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const target = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate() + 14);
+  const name = suggestName(prompt);
 
   return {
-    name: suggestName(prompt),
+    name,
     type,
+    governance: regulated ? "Regulated / safety-critical" : has(t, "invest", "pilot", "budget") ? "Controlled" : "Standard",
+    priority: has(t, "urgent", "critical", "asap") ? "Critical" : "High",
+    start: iso(today),
+    target: iso(target),
+    background: `Build an evidence-based case for ${name ? name.toLowerCase() : "this work"} to support a go / no-go decision.`,
     objective: prompt.trim(),
     departments: deps,
+    teams: deps.map((d) => teamsFor(d)[0]),
     workstreams,
+    gates: [
+      {
+        name: "Feasibility decision",
+        approver: PEOPLE[0].name,
+        date: iso(target),
+        criteria: "Recommendation is backed by reviewed evidence and an agreed cost range",
+        workstreams: workstreams.map((w) => w.name),
+      },
+    ],
+    risks: [
+      {
+        risk: "Key evidence or supplier data is unavailable in time",
+        owner: PEOPLE[1].name,
+        severity: "Medium",
+        response: "Agree data requests early and track them weekly",
+      },
+    ],
     inScope: [
       "Assess the available options against the stated requirements",
       "Gather and review evidence from internal and external sources",
@@ -335,10 +378,10 @@ export type Missing = { step: string; text: string };
 
 export function missingItems(d: Draft): Missing[] {
   const m: Missing[] = [];
-  if (!d.name.trim()) m.push({ step: "basics", text: "Project name" });
-  if (!d.objective.trim()) m.push({ step: "goal", text: "Business objective" });
+  if (!d.name.trim()) m.push({ step: "charter", text: "Project name" });
+  if (!d.objective.trim()) m.push({ step: "charter", text: "Business objective" });
   if (d.start && d.target && d.target < d.start)
-    m.push({ step: "context", text: "Target completion is before the planned start" });
+    m.push({ step: "scope", text: "Target completion is before the planned start" });
   if (!d.departments.length) m.push({ step: "team", text: "At least one participating department" });
   if (d.teamMode === TEAM_MODES[0].value) {
     for (const dep of d.departments)
