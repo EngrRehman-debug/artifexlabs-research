@@ -17,10 +17,14 @@ export type Workstream = {
 
 export type Gate = {
   name: string;
+  /** decision owner (Figma "Decision Owner") */
+  owner: string;
   approver: string;
   date: string;
   criteria: string;
   workstreams: string[];
+  /** "Require all linked research packages to be accepted" */
+  requireAll: boolean;
 };
 
 export type Risk = {
@@ -59,6 +63,10 @@ export type Draft = {
   teams: string[];
   steering: string[];
   stakeholders: string;
+  /** Figma "Stakeholder And Decision Notes" */
+  decisionNotes: string;
+  /** Figma "External Organizations" (comma-separated) */
+  externalOrgs: string;
   /* 03 Delivery */
   workstreams: Workstream[];
   gates: Gate[];
@@ -80,6 +88,8 @@ export type Draft = {
   changeAuth: string;
   standards: string;
   qualityLead: string;
+  /** Figma "Gate Approval Rule" */
+  gateRule: string;
   regControls: string[];
   dataLocation: string;
   retention: string;
@@ -131,7 +141,36 @@ export const DEPARTMENTS = [
   "Strategy & Corporate Development",
 ];
 
-export const teamsFor = (dept: string) => [`${dept} · Core team`, `${dept} · Specialist team`];
+/* Teams per department (Figma "Participating Teams": name, department lead, code · people). */
+export type Team = { name: string; code: string; lead: string; people: number };
+const TEAM_DATA: Record<string, Team[]> = {
+  "Research & Development": [
+    { name: "Discovery Research", code: "RND-DIS", lead: "Sarah Chen", people: 1 },
+    { name: "Applied Research", code: "RND-APP", lead: "Sarah Chen", people: 3 },
+  ],
+  Engineering: [
+    { name: "Systems Engineering", code: "ENG-SYS", lead: "Omar Patel", people: 2 },
+    { name: "Process Engineering", code: "ENG-PRO", lead: "Omar Patel", people: 2 },
+  ],
+  "Quality & Regulatory Affairs": [
+    { name: "Quality Assurance", code: "QRA-QA", lead: "Ibrahim Ghatila", people: 1 },
+    { name: "Regulatory Affairs", code: "QRA-REG", lead: "Ibrahim Ghatila", people: 1 },
+  ],
+  "Commercial & Marketing": [{ name: "Market Insights", code: "COM-MKT", lead: "Omar Patel", people: 2 }],
+  Finance: [{ name: "Financial Planning", code: "FIN-FPA", lead: "Ibrahim Ghatila", people: 1 }],
+  Operations: [{ name: "Site Operations", code: "OPS-SITE", lead: "Omar Patel", people: 3 }],
+};
+const teamsOf = (dept: string): Team[] =>
+  TEAM_DATA[dept] ?? [{ name: `${dept.split(/[ &,]/)[0]} Core Team`, code: dept.slice(0, 3).toUpperCase() + "-CORE", lead: "Ibrahim Ghatila", people: 1 }];
+/** team ids are "Department · Team name" */
+export const teamsFor = (dept: string) => teamsOf(dept).map((t) => `${dept} · ${t.name}`);
+export function teamInfo(id: string): (Team & { department: string }) | null {
+  const [department, name] = id.split(" · ");
+  const t = teamsOf(department).find((x) => x.name === name);
+  return t ? { ...t, department } : null;
+}
+
+export const GATE_RULES = ["Sponsor and accountable reviewers", "Project lead", "Steering group", "Quality and project lead"];
 
 export const TEAM_MODES = [
   { value: "Assign participating teams now", desc: "Pick the teams that will do the work" },
@@ -144,21 +183,18 @@ export const CURRENCIES = ["USD", "GBP", "EUR", "MYR", "PKR"];
 export const SEVERITIES = ["Low", "Medium", "High"];
 
 export const CONTROL_FIELDS = [
-  { key: "visibility", label: "Project visibility", options: ["Project members only", "Organization summary"] },
-  { key: "classification", label: "Information classification", options: ["Internal", "Confidential", "Restricted", "Public"] },
-  { key: "planEditing", label: "Research plan editing", options: ["Project lead and admins", "Project members"] },
-  { key: "manageAccess", label: "Manage project access", options: ["Project lead and admins", "Admins only"] },
-  { key: "approvals", label: "Research approvals", options: ["Project lead", "Department reviewers, then project lead"] },
-  { key: "changeAuth", label: "Change authorization", options: ["Project lead", "Sponsor and project lead", "Steering group", "Quality and project lead"] },
+  { key: "visibility", label: "Project Visibility", options: ["Project members only", "Organization summary"] },
+  { key: "classification", label: "Information Classification", options: ["Internal", "Confidential", "Restricted", "Public"] },
+  { key: "planEditing", label: "Research Plan Editing", options: ["Project lead and admins", "Project members"] },
+  { key: "manageAccess", label: "Manage Project Access", options: ["Project lead and admins", "Admins only"] },
+  { key: "approvals", label: "Research Approvals", options: ["Project lead", "Department reviewers, then project lead"] },
+  { key: "changeAuth", label: "Change Authorization", options: ["Project lead", "Sponsor and project lead", "Steering group", "Quality and project lead"] },
 ] as const;
 
 export type ControlKey = (typeof CONTROL_FIELDS)[number]["key"];
 
-export const REG_CONTROLS = [
-  "Electronic signatures on approvals",
-  "Full audit trail on records",
-  "Controlled document templates",
-];
+/* Figma "Quality And Assurance" checkboxes */
+export const REG_CONTROLS = ["Independent acceptance", "Evidence traceability", "Record decisions and changes"];
 
 export const EXTERNAL_ACCESS = [
   { value: "No external access", desc: "Only people inside the organization" },
@@ -206,7 +242,7 @@ export const emptyWorkstream = (department = DEPARTMENTS[0]): Workstream => ({
   due: "",
   dependencies: "",
 });
-export const emptyGate = (): Gate => ({ name: "", approver: "", date: "", criteria: "", workstreams: [] });
+export const emptyGate = (): Gate => ({ name: "", owner: "", approver: "", date: "", criteria: "", workstreams: [], requireAll: false });
 export const emptyRisk = (): Risk => ({ risk: "", owner: "", severity: "Medium", response: "" });
 
 export const EMPTY_DRAFT: Draft = {
@@ -235,6 +271,8 @@ export const EMPTY_DRAFT: Draft = {
   teams: [],
   steering: [],
   stakeholders: "",
+  decisionNotes: "",
+  externalOrgs: "",
   workstreams: [],
   gates: [],
   risks: [],
@@ -249,7 +287,8 @@ export const EMPTY_DRAFT: Draft = {
   ...recommendedControls("Controlled"),
   standards: "",
   qualityLead: "",
-  regControls: [...REG_CONTROLS],
+  gateRule: GATE_RULES[0],
+  regControls: [],
   dataLocation: "",
   retention: "",
   externalAccess: "No external access",
@@ -317,8 +356,8 @@ export function suggestFromPrompt(prompt: string): Partial<Draft> {
       ...emptyWorkstream(d),
       ...WS_BY_DEPT[d],
       team: teamsFor(d)[0],
-      owner: PEOPLE[0].name,
-      reviewer: PEOPLE[1].name,
+      owner: PEOPLE[1].name,
+      reviewer: PEOPLE[2].name,
     }));
 
   const regulated = has(t, "regulat", "safety", "complian", "certif");
@@ -327,6 +366,10 @@ export function suggestFromPrompt(prompt: string): Partial<Draft> {
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const target = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate() + 14);
   const name = suggestName(prompt);
+  for (const w of workstreams) {
+    w.start = iso(today);
+    w.due = iso(target);
+  }
 
   return {
     name,
@@ -337,22 +380,27 @@ export function suggestFromPrompt(prompt: string): Partial<Draft> {
     target: iso(target),
     background: `Build an evidence-based case for ${name ? name.toLowerCase() : "this work"} to support a go / no-go decision.`,
     objective: prompt.trim(),
+    sponsor: PEOPLE[0].name,
+    lead: PEOPLE[2].name,
+    steering: [PEOPLE[0].name],
     departments: deps,
     teams: deps.map((d) => teamsFor(d)[0]),
     workstreams,
     gates: [
       {
         name: "Feasibility decision",
+        owner: PEOPLE[2].name,
         approver: PEOPLE[0].name,
         date: iso(target),
         criteria: "Recommendation is backed by reviewed evidence and an agreed cost range",
         workstreams: workstreams.map((w) => w.name),
+        requireAll: false,
       },
     ],
     risks: [
       {
         risk: "Key evidence or supplier data is unavailable in time",
-        owner: PEOPLE[1].name,
+        owner: PEOPLE[2].name,
         severity: "Medium",
         response: "Agree data requests early and track them weekly",
       },
@@ -378,25 +426,25 @@ export type Missing = { step: string; text: string };
 
 export function missingItems(d: Draft): Missing[] {
   const m: Missing[] = [];
-  if (!d.name.trim()) m.push({ step: "charter", text: "Project name" });
-  if (!d.objective.trim()) m.push({ step: "charter", text: "Business objective" });
+  if (!d.name.trim()) m.push({ step: "charter", text: "Charter: Add a project name." });
+  if (!d.objective.trim()) m.push({ step: "charter", text: "Charter: Describe the business objective." });
   if (d.start && d.target && d.target < d.start)
-    m.push({ step: "scope", text: "Target completion is before the planned start" });
-  if (!d.departments.length) m.push({ step: "team", text: "At least one participating department" });
+    m.push({ step: "scope", text: "Scope: Target completion is before the planned start." });
+  if (!d.departments.length) m.push({ step: "org", text: "Organization: Select at least one participating department." });
   if (d.teamMode === TEAM_MODES[0].value) {
     for (const dep of d.departments)
       if (!d.teams.some((t) => t.startsWith(dep + " ·")))
-        m.push({ step: "team", text: `${dep}: select a participating team` });
+        m.push({ step: "org", text: `${dep}: Select a participating team.` });
   }
   if (!d.workstreams.some((w) => w.name.trim() && w.owner && w.output.trim()))
-    m.push({ step: "workstreams", text: "At least one workstream with an owner and expected output" });
+    m.push({ step: "delivery", text: "Workstreams: Add one with an owner and expected output." });
   if (!d.gates.some((g) => g.name.trim() && g.criteria.trim()))
-    m.push({ step: "gates", text: "At least one decision gate with acceptance criteria" });
+    m.push({ step: "delivery", text: "Decision Gates: Add one with acceptance criteria." });
   d.gates.forEach((g, i) => {
-    if (!g.approver) m.push({ step: "gates", text: `Decision gate ${i + 1}: assign an approver` });
-    if (!g.workstreams.length) m.push({ step: "gates", text: `Decision gate ${i + 1}: select the workstreams it covers` });
+    if (!g.approver) m.push({ step: "delivery", text: `Decision Gate ${i + 1}: Assign an approver.` });
+    if (!g.workstreams.length) m.push({ step: "delivery", text: `Decision Gate ${i + 1}: Select the workstreams it covers.` });
   });
   if (!d.risks.some((r) => r.risk.trim()) && !d.noRiskReason.trim())
-    m.push({ step: "risks", text: "An initial risk, or why no material risks are identified" });
+    m.push({ step: "delivery2", text: "Risk Register: Add a risk, or explain why there are none." });
   return m;
 }

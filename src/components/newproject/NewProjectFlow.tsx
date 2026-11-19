@@ -6,38 +6,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Database01, Send03 } from "@untitledui/icons";
 import {
   Add01Icon,
-  Alert02Icon,
   ArrowDown01Icon,
-  ArrowRight01Icon,
   CheckmarkCircle02Icon,
   Image02Icon,
   Mic01Icon,
   Pdf02Icon,
-  PencilEdit02Icon,
   RefreshIcon,
-  SparklesIcon,
-  Tick02Icon,
   Cancel01Icon,
-  CheckListIcon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge, untitled } from "@/components/dashboard/Icon";
-import {
-  EMPTY_DRAFT,
-  missingItems,
-  suggestFromPrompt,
-  type Draft,
-} from "@/lib/newProject";
+import { EMPTY_DRAFT, suggestFromPrompt, type Draft } from "@/lib/newProject";
 import { addCreated, slugFor } from "@/lib/createdProjects";
 import {
-  CARDS,
-  KvRow,
+  AiAvatar,
+  ReviewStep,
   SECTIONS,
-  SubCard,
-  type CardDef,
+  STEPS,
   type Ctx,
+  type StepCtx,
 } from "./cards";
 
-const STORE = "newProject:draft:v2";
+const STORE = "newProject:draft:v3";
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 type Phase = "prompt" | "chat" | "done";
 type Msg = { from: "ai" | "user"; text: string; at: number };
@@ -51,9 +40,9 @@ type Saved = {
   maxIdx: number;
 };
 
-const CARD_IDS = CARDS.map((c) => c.id);
+const STEP_IDS = STEPS.map((c) => c.id);
 const indexOf = (id: string) =>
-  id === "review" ? CARDS.length : CARD_IDS.indexOf(id);
+  id === "review" ? STEPS.length : STEP_IDS.indexOf(id);
 
 /* Restore defensively: an old or damaged draft must never break the page. */
 const read = (): Saved | null => {
@@ -83,7 +72,7 @@ const read = (): Saved | null => {
       if (!Array.isArray(d[k]))
         (d as Record<string, unknown>)[k] = EMPTY_DRAFT[k];
     const cur =
-      typeof s.cur === "string" && indexOf(s.cur) >= 0 ? s.cur : CARDS[0].id;
+      typeof s.cur === "string" && indexOf(s.cur) >= 0 ? s.cur : STEPS[0].id;
     return {
       phase: "chat",
       d,
@@ -127,15 +116,6 @@ const hasValue = (v: unknown) =>
       : v != null;
 
 /* ---------------- Figma "Create New Project" pieces ---------------- */
-
-/** Blue 40px AI avatar with the sparkle */
-function AiAvatar() {
-  return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue text-white">
-      <Icon icon={huge(SparklesIcon)} size={20} stroke={1.5} />
-    </span>
-  );
-}
 
 /** Stepper: 5 circles (40px) on a 4px track with a midpoint dot per segment. */
 function Stepper({
@@ -191,11 +171,7 @@ function Stepper({
                   : "border-2 border-[#EDEDF0] bg-white text-[#667085]"
               } ${open ? "hover:ring-4 hover:ring-blue/15" : ""}`}
             >
-              {done ? (
-                <Icon icon={huge(Tick02Icon)} size={18} stroke={2} />
-              ) : (
-                i + 1
-              )}
+              {i + 1}
             </button>
             <span
               className={`text-center text-sm leading-[1.5] tracking-[-0.02em] sm:text-base ${
@@ -265,219 +241,6 @@ function UserBubble({
   );
 }
 
-function ConfirmButton({
-  onClick,
-  label = "Confirm & Continue",
-  disabled,
-}: {
-  onClick: () => void;
-  label?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-9 w-fit items-center gap-1 rounded-lg bg-blue px-3 text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-white disabled:opacity-40"
-    >
-      {label}
-      <Icon icon={huge(ArrowRight01Icon)} size={16} stroke={1.8} />
-    </button>
-  );
-}
-
-function ErrorLine({ text }: { text: string | null }) {
-  if (!text) return null;
-  return (
-    <p
-      role="alert"
-      className="flex items-center gap-1.5 text-sm text-[#F04438]"
-    >
-      <Icon icon={huge(Alert02Icon)} size={15} stroke={1.5} />
-      {text}
-    </p>
-  );
-}
-
-/** The AI card: white, radius 20, padding 16; header (icon + title, Edit Details) and a grey inner panel. */
-function AiCard({
-  card,
-  ctx,
-  onToggleEdit,
-  onConfirm,
-  error,
-}: {
-  card: CardDef;
-  ctx: Ctx;
-  onToggleEdit: () => void;
-  onConfirm: () => void;
-  error: string | null;
-}) {
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-2.5">
-        <span className="hidden sm:block">
-          <AiAvatar />
-        </span>
-        <article className="flex min-w-0 flex-1 flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-white p-4">
-          <header className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="flex items-center gap-2 text-lg leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37]">
-              <Icon icon={huge(card.icon)} size={20} stroke={1.6} />
-              {card.title}
-            </h3>
-            <button
-              type="button"
-              onClick={onToggleEdit}
-              aria-pressed={ctx.editing}
-              className={`flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm leading-[1.5] font-semibold tracking-[-0.02em] ${
-                ctx.editing
-                  ? "border border-blue bg-white text-blue hover:bg-blue/[0.04]"
-                  : "bg-blue text-white"
-              }`}
-            >
-              <Icon
-                icon={huge(ctx.editing ? Tick02Icon : PencilEdit02Icon)}
-                size={16}
-                stroke={1.6}
-              />
-              {ctx.editing ? "Done Editing" : "Edit Details"}
-            </button>
-          </header>
-          <div className="flex flex-col gap-2.5 rounded-2xl border border-[#EDEDF0] bg-[#FAFAFA] p-3 sm:p-5">
-            {card.body(ctx)}
-            {!card.after && (
-              <div className="mt-1.5 flex flex-col gap-2">
-                <ErrorLine text={error} />
-                <ConfirmButton onClick={onConfirm} />
-              </div>
-            )}
-          </div>
-        </article>
-      </div>
-      {card.after && (
-        <article className="flex flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-white p-4">
-          <h3 className="flex items-center gap-2 text-lg leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37]">
-            <Icon icon={huge(card.after.icon)} size={20} stroke={1.6} />
-            {card.after.title}
-          </h3>
-          {card.after.body(ctx)}
-          <div className="flex flex-col gap-2">
-            <ErrorLine text={error} />
-            <ConfirmButton onClick={onConfirm} />
-          </div>
-        </article>
-      )}
-    </div>
-  );
-}
-
-/** Review: every confirmed card as a read-only summary row, missing items, Create project. */
-function ReviewCard({
-  d,
-  onJump,
-  onCreate,
-}: {
-  d: Draft;
-  onJump: (id: string) => void;
-  onCreate: () => void;
-}) {
-  const missing = missingItems(d);
-  return (
-    <div className="flex items-start gap-2.5">
-      <span className="hidden sm:block">
-        <AiAvatar />
-      </span>
-      <article className="flex min-w-0 flex-1 flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-white p-4">
-        <header className="flex items-center gap-2">
-          <Icon icon={huge(CheckListIcon)} size={20} stroke={1.6} />
-          <h3 className="text-lg leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37]">
-            Review And Create
-          </h3>
-        </header>
-        <div className="flex flex-col gap-2.5 rounded-2xl border border-[#EDEDF0] bg-[#FAFAFA] p-3 sm:p-5">
-          <div className="flex flex-col gap-1 pb-1">
-            <p className="text-xs font-semibold tracking-[0.06em] text-blue uppercase">
-              {d.governance} project
-            </p>
-            <p className="text-lg leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37]">
-              {d.name || "Untitled project"}
-            </p>
-            <p className="text-sm leading-[1.5] text-body">{d.objective}</p>
-          </div>
-          {SECTIONS.filter((s) => s !== "Review").map((sec) => (
-            <SubCard
-              key={sec}
-              icon={CARDS.find((c) => c.section === sec)!.icon}
-              title={sec}
-            >
-              <div className="flex flex-col gap-2.5">
-                {CARDS.filter((c) => c.section === sec).map((c) => (
-                  <KvRow
-                    key={c.id}
-                    grey
-                    label={<span className="text-base">{c.title}</span>}
-                  >
-                    <span className="flex items-start justify-between gap-3">
-                      <span className="min-w-0 text-sm leading-[1.5] break-words text-[#344054]">
-                        {c.summary(d)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onJump(c.id)}
-                        className="shrink-0 text-sm font-semibold text-blue hover:underline"
-                      >
-                        Edit
-                      </button>
-                    </span>
-                  </KvRow>
-                ))}
-              </div>
-            </SubCard>
-          ))}
-          {missing.length > 0 ? (
-            <div className="rounded-xl border border-[#FF6720]/30 bg-[#FF6720]/[0.05] p-4">
-              <p className="flex items-center gap-1.5 text-sm font-semibold text-[#FF6720]">
-                <Icon icon={huge(Alert02Icon)} size={15} stroke={1.5} />
-                {plural(missing.length, "item")} to complete
-              </p>
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {missing.map((m) => (
-                  <li
-                    key={m.text}
-                    className="flex items-center justify-between gap-2 text-sm text-[#344054]"
-                  >
-                    {m.text}
-                    <button
-                      type="button"
-                      onClick={() => onJump(m.step)}
-                      className="shrink-0 font-semibold text-blue hover:underline"
-                    >
-                      Fix
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="flex items-center gap-1.5 text-sm font-medium text-[#2BCB23]">
-              <Icon icon={huge(CheckmarkCircle02Icon)} size={16} stroke={1.5} />
-              Everything required is in place.
-            </p>
-          )}
-          <div className="mt-1.5">
-            <ConfirmButton
-              label="Create Project"
-              onClick={onCreate}
-              disabled={missing.length > 0}
-            />
-          </div>
-        </div>
-      </article>
-    </div>
-  );
-}
-
 /* ---------------- main flow ---------------- */
 
 export default function NewProjectFlow({
@@ -487,7 +250,7 @@ export default function NewProjectFlow({
 }) {
   const [phase, setPhase] = useState<Phase>("prompt");
   const [d, setD] = useState<Draft>(EMPTY_DRAFT);
-  const [cur, setCur] = useState<string>(CARDS[0].id);
+  const [cur, setCur] = useState<string>(STEPS[0].id);
   const [startedAt, setStartedAt] = useState(0);
   const [touched, setTouched] = useState<string[]>([]);
   const [thread, setThread] = useState<Record<string, Msg[]>>({});
@@ -500,6 +263,7 @@ export default function NewProjectFlow({
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState("");
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
@@ -547,11 +311,11 @@ export default function NewProjectFlow({
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [cur, phase]);
 
-  const card = CARDS.find((c) => c.id === cur) ?? null; // null => review
+  const step = STEPS.find((c) => c.id === cur) ?? null; // null => review
   const idx = indexOf(cur);
-  const si = card ? SECTIONS.indexOf(card.section) : SECTIONS.length - 1;
+  const si = step ? SECTIONS.indexOf(step.section) : SECTIONS.length - 1;
   const partial =
-    !!card && CARDS.findIndex((c) => c.section === card.section) < idx;
+    !!step && STEPS.findIndex((c) => c.section === step.section) < idx;
 
   const set = useCallback(
     (patch: Partial<Draft> | ((d: Draft) => Partial<Draft>)) => {
@@ -574,10 +338,10 @@ export default function NewProjectFlow({
     () => ({
       d,
       set,
-      editing,
+      editing: editing || !!step?.alwaysEdit,
       ai: (k) => !touched.includes(k as string) && hasValue(d[k]),
     }),
-    [d, set, editing, touched],
+    [d, set, editing, touched, step],
   );
 
   const go = (id: string) => {
@@ -588,21 +352,22 @@ export default function NewProjectFlow({
   };
 
   const confirm = () => {
-    if (!card) return;
-    const msg = card.validate?.(d);
+    if (!step) return;
+    const msg = step.validate?.(d);
     if (msg) {
       setError(msg);
       setEditing(true);
       return;
     }
-    go(CARDS[idx + 1]?.id ?? "review");
+    go(STEPS[idx + 1]?.id ?? "review");
   };
+  const back = idx > 0 ? () => go(STEPS[idx - 1].id) : undefined;
 
   const openSection = (i: number) => {
     const first =
       SECTIONS[i] === "Review"
         ? "review"
-        : CARDS.find((c) => c.section === SECTIONS[i])!.id;
+        : STEPS.find((c) => c.section === SECTIONS[i])!.id;
     if (indexOf(first) <= maxIdx) go(first);
   };
 
@@ -621,7 +386,7 @@ export default function NewProjectFlow({
     setTouched([]);
     setThread({});
     setMaxIdx(0);
-    setCur(CARDS[0].id);
+    setCur(STEPS[0].id);
     setEditing(false);
     setPhase("chat");
   };
@@ -629,7 +394,7 @@ export default function NewProjectFlow({
   const reset = () => {
     write(null);
     setD(EMPTY_DRAFT);
-    setCur(CARDS[0].id);
+    setCur(STEPS[0].id);
     setPromptText("");
     setFiles([]);
     setThread({});
@@ -650,8 +415,8 @@ export default function NewProjectFlow({
     const text = message.trim();
     if (!text) return;
     const at = Date.now();
-    const reply = card
-      ? `Noted for “${card.title}”. Use Edit Details to change any field, then Confirm & Continue when it looks right.`
+    const reply = step
+      ? `Noted for the ${step.section} step. Change any field above, then Confirm & Continue when it looks right.`
       : "Noted. Use Edit on any section to change it, then Create Project.";
     setThread((t) => ({
       ...t,
@@ -864,7 +629,7 @@ export default function NewProjectFlow({
             partial={partial}
             completed={(i) =>
               SECTIONS[i] !== "Review" &&
-              CARDS.reduce(
+              STEPS.reduce(
                 (m, c, j) => (c.section === SECTIONS[i] ? j : m),
                 -1,
               ) < maxIdx
@@ -873,7 +638,7 @@ export default function NewProjectFlow({
               indexOf(
                 SECTIONS[i] === "Review"
                   ? "review"
-                  : CARDS.find((c) => c.section === SECTIONS[i])!.id,
+                  : STEPS.find((c) => c.section === SECTIONS[i])!.id,
               ) <= maxIdx
             }
             onOpen={openSection}
@@ -882,14 +647,14 @@ export default function NewProjectFlow({
       </div>
 
       {/* conversation card: #FAFAFA, border, radius 20; composer pinned to its bottom */}
-      <section className="mt-8 flex min-h-[calc(100dvh-236px)] flex-col rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] shadow-[0_14px_30px_0_rgba(40,92,224,0.06)]">
+      <section className="mt-8 flex min-h-[calc(100dvh-236px)] flex-col rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA]">
         <div className="flex flex-1 flex-col gap-5 px-3 pt-[30px] pb-6 sm:px-5">
           {resumed && (
             <p className="w-fit rounded-lg bg-blue/[0.06] px-3 py-2 text-sm text-blue">
               Welcome back. I restored your unfinished draft.
             </p>
           )}
-          {cur === CARDS[0].id && (
+          {cur === STEPS[0].id && (
             <>
               <AiBubble
                 text="Let's set up your new project. I've prepared a draft from your objective."
@@ -907,18 +672,25 @@ export default function NewProjectFlow({
             </>
           )}
 
-          {card ? (
-            <AiCard
-              key={card.id}
-              card={card}
-              ctx={ctx}
-              error={error}
-              onConfirm={confirm}
-              onToggleEdit={() => setEditing((e) => !e)}
-            />
-          ) : (
-            <ReviewCard d={d} onJump={go} onCreate={create} />
-          )}
+          {(() => {
+            const sc: StepCtx = {
+              ...ctx,
+              toggleEdit: () => setEditing((e) => !e),
+              back,
+              confirm,
+              jump: go,
+              create,
+              saveDraft: () => {
+                write({ phase, d, cur, startedAt, touched, thread, maxIdx });
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+              },
+              saved,
+              error,
+            };
+            const View = step ? step.render : ReviewStep;
+            return <View key={cur} {...sc} />;
+          })()}
 
           {msgs.map((m, i) =>
             m.from === "user" ? (
@@ -932,9 +704,9 @@ export default function NewProjectFlow({
 
         <form
           onSubmit={send}
-          className="sticky bottom-0 z-10 rounded-b-[20px] border-t border-[#EDEDF0] bg-white p-3 shadow-[0_-14px_30px_0_rgba(40,92,224,0.06)] sm:p-5"
+          className="sticky bottom-0 z-10 -mx-px -mb-px rounded-[20px] border border-[#EDEDF0] bg-white p-3 shadow-[0_14px_30px_0_rgba(40,92,224,0.10)] sm:p-5"
         >
-          <label className="flex min-h-[70px] items-center gap-2.5 rounded-2xl border border-[#EDEDF0] bg-[#FAFAFA] py-3 pr-4 pl-4 focus-within:border-blue">
+          <label className="flex min-h-[70px] items-center gap-2.5 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-4 focus-within:border-blue">
             <Icon
               icon={huge(Add01Icon)}
               size={18}

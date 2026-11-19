@@ -1,23 +1,22 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
-  ArrowDown01Icon,
-  BinocularsIcon,
-  Building03Icon,
-  Delete02Icon,
-  File02Icon,
-  Flag02Icon,
-  HelpCircleIcon,
   Add01Icon,
-  Route01Icon,
-  Shield01Icon,
-  SparklesIcon,
-  TradeUpIcon,
-  UserGroupIcon,
   Alert02Icon,
-  Wallet01Icon,
-  Database01Icon,
+  ArrowDown01Icon,
+  ArrowLeft01Icon,
+  ArrowRight01Icon,
+  BinocularsIcon,
+  Calendar03Icon,
+  Cancel01Icon,
+  File02Icon,
+  HelpCircleIcon,
+  PencilEdit02Icon,
+  Settings02Icon,
+  SparklesIcon,
+  Tick02Icon,
+  TradeUpIcon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge } from "@/components/dashboard/Icon";
 import {
@@ -26,6 +25,7 @@ import {
   CURRENCIES,
   DEPARTMENTS,
   EXTERNAL_ACCESS,
+  GATE_RULES,
   GOVERNANCE,
   PEOPLE,
   PRIORITIES,
@@ -38,10 +38,20 @@ import {
   emptyGate,
   emptyRisk,
   emptyWorkstream,
+  missingItems,
   recommendedControls,
+  teamInfo,
   teamsFor,
   type Draft,
+  type Gate,
+  type Risk,
+  type Workstream,
 } from "@/lib/newProject";
+
+/*
+ * Figma "New Projects Generating Process 1 … 5": one screen per step.
+ * 1 Charter · 1.5 Scope · 2 Organization · 3 Delivery · 3.5 Delivery (risks, planning) · 4 Controls · 5 Review
+ */
 
 export type Section =
   "Charter" | "Organization" | "Delivery" | "Controls" | "Review";
@@ -63,29 +73,32 @@ export type Ctx = {
   ai: (key: keyof Draft) => boolean;
 };
 
-export type CardDef = {
-  id: string;
-  section: Exclude<Section, "Review">;
-  title: string;
-  icon: IconSvg;
-  /** rows inside the grey inner panel of the AI card */
-  body: (c: Ctx) => ReactNode;
-  /** optional full-width card under the AI card (Figma "Assumptions And Dependencies"); always editable */
-  after?: { title: string; icon: IconSvg; body: (c: Ctx) => ReactNode };
-  validate?: (d: Draft) => string | null;
-  summary: (d: Draft) => string;
+export type StepCtx = Ctx & {
+  toggleEdit: () => void;
+  back?: () => void;
+  confirm: () => void;
+  jump: (id: string) => void;
+  create: () => void;
+  saveDraft: () => void;
+  saved: boolean;
+  error: string | null;
 };
 
-/* ---------------- primitives (Figma "Project Charter" card) ---------------- */
+export type StepDef = {
+  id: string;
+  section: Exclude<Section, "Review">;
+  /** fields are inputs from the start (Figma shows no "Edit Details" on these screens) */
+  alwaysEdit?: boolean;
+  validate?: (d: Draft) => string | null;
+  render: (c: StepCtx) => ReactNode;
+};
+
+/* ---------------- primitives ---------------- */
 
 const LABEL =
-  "text-base leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-lg";
-const lines = (s: string) =>
-  s
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-const orDash = (s: string) => (s.trim() ? s.trim() : "—");
+  "text-base leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-lg";
+const H3 =
+  "text-lg leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37]";
 const names = PEOPLE.map((p) => p.name);
 
 /** 11/18/2026 like the design */
@@ -94,12 +107,21 @@ export const showDate = (iso: string) => {
   return y && m && d ? `${m}/${d}/${y}` : iso;
 };
 
+/** Blue 40px AI avatar with the sparkle */
+export function AiAvatar() {
+  return (
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue text-white">
+      <Icon icon={huge(SparklesIcon)} size={20} stroke={1.5} />
+    </span>
+  );
+}
+
 /** Figma "AI Suggested": 36 high, radius 8, border #EDEDF0, sparkle + Inter 500 14 #667085 */
 export function AiChip() {
   return (
     <span
       title="Drafted by AI from your description"
-      className="flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[#EDEDF0] bg-white px-3 text-sm leading-[1.5] font-medium tracking-[-0.02em] whitespace-nowrap text-body"
+      className="flex h-9 shrink-0 items-center gap-1 rounded-[10px] border border-[#EDEDF0] bg-white px-3 py-2 text-sm leading-[1.5] font-medium tracking-[-0.02em] whitespace-nowrap text-body"
     >
       <Icon icon={huge(SparklesIcon)} size={14} stroke={1.4} />
       <span className="hidden sm:inline">AI Suggested</span>
@@ -107,32 +129,174 @@ export function AiChip() {
   );
 }
 
-/** Label column 184 + gap 10; value box min 62 high, radius 12, padding 16 / 15. */
+/** Avatar column + content (all AI answers) */
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="hidden sm:block">
+        <AiAvatar />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-5">{children}</div>
+    </div>
+  );
+}
+
+/** White card: radius 20, padding 16, gap 20; header with icon + title (Inter 600 18) and an optional action. */
+function Card({
+  icon,
+  title,
+  action,
+  children,
+}: {
+  icon?: IconSvg;
+  title?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <article className="flex min-w-0 flex-col gap-5 rounded-[20px] border border-[#EDEDF0] bg-white p-4">
+      {(title || action) && (
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className={`flex items-center gap-2 ${H3}`}>
+            {icon && <Icon icon={huge(icon)} size={20} stroke={1.6} />}
+            {title}
+          </h3>
+          {action}
+        </header>
+      )}
+      {children}
+    </article>
+  );
+}
+
+/** Grey inner panel: #FAFAFA, border, radius 16, padding 20, rows 10 apart */
+function Panel({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-[#EDEDF0] bg-[#FAFAFA] p-3 shadow-[0_14px_30px_0_rgba(40,92,224,0.02)] sm:p-5">
+      {children}
+    </div>
+  );
+}
+
+const BLUE_BTN =
+  "flex h-9 items-center gap-1.5 rounded-[10px] bg-blue px-3 py-2 text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-white disabled:opacity-40";
+
+function EditButton({
+  editing,
+  onClick,
+}: {
+  editing: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={editing}
+      className={
+        editing
+          ? "flex h-9 items-center gap-1.5 rounded-[10px] border border-blue bg-white px-3 text-sm font-semibold text-blue hover:bg-blue/[0.04]"
+          : BLUE_BTN
+      }
+    >
+      <Icon
+        icon={huge(editing ? Tick02Icon : PencilEdit02Icon)}
+        size={16}
+        stroke={1.6}
+      />
+      {editing ? "Done Editing" : "Edit Details"}
+    </button>
+  );
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={BLUE_BTN}>
+      <Icon icon={huge(Add01Icon)} size={16} stroke={1.8} />
+      {label}
+    </button>
+  );
+}
+
+function RemoveButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-9 items-center gap-1.5 rounded-[10px] border border-[#EDEDF0] bg-white px-3 py-2 text-sm font-medium text-[#101D37] hover:border-[#F04438]/40 hover:text-[#F04438]"
+    >
+      <Icon icon={huge(Cancel01Icon)} size={14} stroke={1.6} />
+      Remove
+    </button>
+  );
+}
+
+function ErrorLine({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p
+      role="alert"
+      className="flex items-center gap-1.5 text-sm text-[#F04438]"
+    >
+      <Icon icon={huge(Alert02Icon)} size={15} stroke={1.5} />
+      {text}
+    </p>
+  );
+}
+
+/** "← Back" (outlined) + "Confirm & Continue →" (blue), both 36 high */
+function Footer({
+  c,
+  confirmLabel = "Confirm & Continue",
+}: {
+  c: StepCtx;
+  confirmLabel?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <ErrorLine text={c.error} />
+      <div className="flex items-center gap-2.5">
+        {c.back && (
+          <button
+            type="button"
+            onClick={c.back}
+            className="flex h-9 items-center gap-1.5 rounded-[10px] border border-[#EDEDF0] bg-white px-3 py-2 text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]"
+          >
+            <Icon icon={huge(ArrowLeft01Icon)} size={16} stroke={1.8} />
+            Back
+          </button>
+        )}
+        <button type="button" onClick={c.confirm} className={BLUE_BTN}>
+          {confirmLabel}
+          <Icon icon={huge(ArrowRight01Icon)} size={16} stroke={1.8} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Label column + value box (min 62 high, radius 12, padding 16 / 15). */
 export function KvRow({
   label,
   ai,
   children,
-  grey,
   top,
+  wide,
 }: {
   label: ReactNode;
   ai?: boolean;
   children: ReactNode;
-  /** value box on #FAFAFA (rows inside a white sub-card) */
-  grey?: boolean;
   /** align label to the top (multi-line values) */
   top?: boolean;
+  /** Figma item rows (workstreams, gates, risks) use a 222px label column */
+  wide?: boolean;
 }) {
   return (
     <div
-      className={`grid gap-x-2.5 gap-y-1.5 sm:grid-cols-[184px_minmax(0,1fr)] ${top ? "items-start" : "items-center"}`}
+      className={`grid gap-x-2.5 gap-y-1.5 ${wide ? "sm:grid-cols-[minmax(0,222px)_minmax(0,1fr)]" : "sm:grid-cols-[184px_minmax(0,1fr)]"} ${top ? "items-start" : "items-center"}`}
     >
       <span className={`${LABEL} ${top ? "sm:pt-[17px]" : ""}`}>{label}</span>
-      <div
-        className={`flex min-h-[62px] items-center gap-3 rounded-xl border border-[#EDEDF0] py-2.5 pr-[15px] pl-4 transition-colors focus-within:border-blue ${
-          grey ? "bg-[#FAFAFA]" : "bg-white"
-        }`}
-      >
+      <div className="flex min-h-[62px] items-center gap-2 rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 transition-colors focus-within:border-blue">
         <div className="min-w-0 flex-1 text-base leading-[1.5] tracking-[-0.02em] text-[#101D37]">
           {children}
         </div>
@@ -145,7 +309,7 @@ export function KvRow({
 const INPUT =
   "w-full min-w-0 bg-transparent text-base leading-[1.5] tracking-[-0.02em] text-[#101D37] outline-none placeholder:text-body";
 
-/** One value: plain text when viewing, an input when "Edit Details" is on. */
+/** One value: plain text when viewing, an input when editing. */
 export function Val({
   editing,
   value,
@@ -183,7 +347,7 @@ export function Val({
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`${INPUT} cursor-pointer appearance-none pr-6 ${tone ?? ""}`}
+          className={`${INPUT} cursor-pointer appearance-none pr-6 ${value ? (tone ?? "") : "text-body"}`}
         >
           {!value && <option value="">{placeholder ?? "Choose"}</option>}
           {options?.map((o) => (
@@ -206,7 +370,7 @@ export function Val({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        rows={2}
+        rows={1}
         className={`${INPUT} block resize-none [field-sizing:content]`}
       />
     );
@@ -229,25 +393,18 @@ function PillSet({
   values,
   onChange,
   empty = "None selected",
+  show = (v: string) => v,
 }: {
   editing: boolean;
   options: readonly string[];
   values: string[];
   onChange: (next: string[]) => void;
   empty?: string;
+  show?: (v: string) => string;
 }) {
   if (!editing)
     return values.length ? (
-      <span className="flex flex-wrap gap-1.5 py-0.5">
-        {values.map((v) => (
-          <span
-            key={v}
-            className="rounded-lg bg-blue/[0.08] px-2.5 py-1 text-sm font-medium text-blue"
-          >
-            {v}
-          </span>
-        ))}
-      </span>
+      <span className="block break-words">{values.map(show).join(", ")}</span>
     ) : (
       <span className="text-body">{empty}</span>
     );
@@ -269,7 +426,7 @@ function PillSet({
                 : "border-[#EDEDF0] bg-white text-body hover:text-[#101D37]"
             }`}
           >
-            {o}
+            {show(o)}
           </button>
         );
       })}
@@ -277,55 +434,65 @@ function PillSet({
   );
 }
 
-/** White sub-card inside the grey panel (Figma "Business Objective"). */
-export function SubCard({
+/** White sub-card inside the grey panel (Figma "Business Objective", "Steering Group And Stakeholders"). */
+function SubCard({
   icon,
   title,
+  desc,
   children,
-  action,
 }: {
-  icon: IconSvg;
+  icon?: IconSvg;
   title: ReactNode;
+  desc?: string;
   children: ReactNode;
-  action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-[#EDEDF0] bg-white p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="flex items-center gap-2 text-base leading-[1.4] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-lg">
-          <Icon icon={huge(icon)} size={18} stroke={1.6} />
+    <div className="flex min-w-0 flex-col gap-2.5 rounded-[20px] border border-[#EDEDF0] bg-white p-4">
+      <div className="flex flex-col gap-1">
+        <h4 className={`flex items-center gap-2 ${H3}`}>
+          {icon && <Icon icon={huge(icon)} size={18} stroke={1.6} />}
           {title}
         </h4>
-        {action}
+        {desc && (
+          <p className="text-xs leading-[1.5] tracking-[-0.02em] text-body">
+            {desc}
+          </p>
+        )}
       </div>
       {children}
     </div>
   );
 }
 
-/** Grey text block inside a sub-card: radius 12, padding 20, Inter 16/24. */
+/** Grey text area: radius 12, padding 20 / 16, Inter 16/24; text when viewing. */
 function Block({
   editing,
   value,
   onChange,
   placeholder,
   label,
+  white,
+  rows = 3,
 }: {
   editing: boolean;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   label: string;
+  white?: boolean;
+  rows?: number;
 }) {
   return (
-    <div className="rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] px-5 py-4 transition-colors focus-within:border-blue">
+    <div
+      className={`min-h-[102px] rounded-2xl border border-[#EDEDF0] p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.02)] transition-colors focus-within:border-blue ${white ? "bg-white" : "bg-[#FAFAFA]"}`}
+    >
       {editing ? (
         <textarea
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          rows={3}
+          rows={rows}
           className={`${INPUT} block resize-none leading-6 [field-sizing:content]`}
         />
       ) : (
@@ -339,108 +506,117 @@ function Block({
   );
 }
 
-/** Always-editable text area of the "Assumptions And Dependencies" card. */
-function OpenArea({
+/** Label above a full-width white input (Figma "External Organizations", "Evidence And Acceptance Criteria"). */
+function Stacked({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <span className={LABEL}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function TextBox({
+  editing,
   value,
   onChange,
   placeholder,
+  label,
 }: {
+  editing: boolean;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-}) {
-  return (
-    <textarea
-      aria-label={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={3}
-      className="min-h-[100px] w-full resize-none rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] px-5 py-4 text-base leading-6 tracking-[-0.02em] text-[#101D37] outline-none [field-sizing:content] placeholder:text-body focus:border-blue"
-    />
-  );
-}
-
-function SmallButton({
-  onClick,
-  children,
-  danger,
-}: {
-  onClick: () => void;
-  children: ReactNode;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex h-8 items-center gap-1 rounded-lg border border-[#EDEDF0] bg-white px-2.5 text-sm font-medium ${
-        danger
-          ? "text-[#D92D20] hover:bg-[#FEF3F2]"
-          : "text-blue hover:bg-blue/[0.05]"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** List of sub-cards (workstreams, gates, risks). */
-function ItemList<T>({
-  c,
-  items,
-  label,
-  icon,
-  make,
-  onChange,
-  row,
-  empty,
-}: {
-  c: Ctx;
-  items: T[];
   label: string;
-  icon: IconSvg;
-  make: () => T;
-  onChange: (next: T[]) => void;
-  row: (item: T, up: (p: Partial<T>) => void) => ReactNode;
-  empty: string;
 }) {
   return (
-    <div className="flex flex-col gap-2.5">
-      {items.length === 0 && <p className="text-sm text-body">{empty}</p>}
-      {items.map((item, i) => (
-        <SubCard
-          key={i}
-          icon={icon}
-          title={`${label} ${i + 1}`}
-          action={
-            c.editing && (
-              <SmallButton
-                danger
-                onClick={() => onChange(items.filter((_, j) => j !== i))}
-              >
-                <Icon icon={huge(Delete02Icon)} size={14} stroke={1.5} />
-                Remove
-              </SmallButton>
-            )
-          }
-        >
-          <div className="flex flex-col gap-2.5">
-            {row(item, (p) =>
-              onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x))),
-            )}
-          </div>
-        </SubCard>
-      ))}
-      {c.editing && (
-        <div>
-          <SmallButton onClick={() => onChange([...items, make()])}>
-            <Icon icon={huge(Add01Icon)} size={14} stroke={1.5} />
-            Add {label.toLowerCase()}
-          </SmallButton>
-        </div>
-      )}
+    <div className="flex min-h-[46px] items-center rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 focus-within:border-blue">
+      <Val
+        label={label}
+        editing={editing}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
     </div>
+  );
+}
+
+/** Checkbox tile: white, border, radius 12 */
+function Check({
+  checked,
+  onChange,
+  label,
+  desc,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  desc?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label
+      className={`flex min-h-[62px] items-center gap-2 rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 ${disabled ? "cursor-default" : "cursor-pointer hover:border-[#D0D5DD]"}`}
+    >
+      <span className="relative flex size-5 shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer size-5 shrink-0 cursor-pointer appearance-none rounded-[5px] border border-[#667085] bg-white transition-colors checked:border-blue checked:bg-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue disabled:cursor-default"
+        />
+        <svg
+          aria-hidden
+          viewBox="0 0 20 20"
+          className="pointer-events-none absolute inset-0 hidden size-5 text-white peer-checked:block"
+        >
+          <path
+            d="M5.5 10.2l3 3 6-6.4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span
+          className={`text-sm leading-[1.5] tracking-[-0.02em] ${desc ? "font-semibold text-[#101D37]" : checked ? "text-[#101D37]" : "text-body"}`}
+        >
+          {label}
+        </span>
+        {desc && (
+          <span className="text-xs leading-[1.5] tracking-[-0.02em] text-body">
+            {desc}
+          </span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+/** Item block inside a section (Figma "Workstream 1" + Remove). */
+function Item({
+  title,
+  onRemove,
+  children,
+}: {
+  title: string;
+  onRemove?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Panel>
+      <div className="flex items-center justify-between gap-2">
+        <span className={H3}>{title}</span>
+        {onRemove && <RemoveButton onClick={onRemove} />}
+      </div>
+      {children}
+    </Panel>
   );
 }
 
@@ -448,28 +624,24 @@ const PRIORITY_TONE: Record<string, string> = {
   High: "text-[#F04438]",
   Critical: "text-[#D92D20] font-medium",
 };
+const upd = <T,>(list: T[], i: number, p: Partial<T>) =>
+  list.map((x, j) => (j === i ? { ...x, ...p } : x));
+const wsName = (w: Workstream, i: number) =>
+  w.name.trim() || (i === 0 ? "Unnamed workstream" : `Workstream ${i + 1}`);
 
-/* ---------------- cards ---------------- */
+/* ---------------- steps ---------------- */
 
-export const CARDS: CardDef[] = [
-  /* ---------- 1 Charter ---------- */
-  {
-    id: "charter",
-    section: "Charter",
-    title: "Project Charter",
-    icon: File02Icon,
-    validate: (d) =>
-      !d.name.trim()
-        ? "Please give the project a name."
-        : !d.objective.trim()
-          ? "Please describe the business objective."
-          : null,
-    summary: (d) =>
-      `${orDash(d.name)} · ${d.type} · ${d.governance} governance · ${d.priority} priority`,
-    body: (c) => {
-      const { d, set, editing, ai } = c;
-      return (
-        <>
+/** Figma 1 – Project Charter */
+function CharterStep(c: StepCtx) {
+  const { d, set, editing, ai } = c;
+  return (
+    <Shell>
+      <Card
+        icon={File02Icon}
+        title="Project Charter"
+        action={<EditButton editing={editing} onClick={c.toggleEdit} />}
+      >
+        <Panel>
           <KvRow label="Project name" ai={ai("name")}>
             <Val
               label="Project name"
@@ -544,679 +716,851 @@ export const CARDS: CardDef[] = [
               placeholder="Decision, change or capability to deliver"
             />
           </SubCard>
-        </>
-      );
-    },
-  },
-  {
-    id: "scope",
-    section: "Charter",
-    title: "Scope And Measures",
-    icon: BinocularsIcon,
-    validate: (d) =>
-      d.start && d.target && d.target < d.start
-        ? "Target completion can't be before the planned start."
-        : null,
-    summary: (d) =>
-      `${d.start ? showDate(d.start) : "Start TBD"} → ${d.target ? showDate(d.target) : "End TBD"} · In: ${lines(d.inScope).length} · Out: ${lines(d.outScope).length} · ${lines(d.measures).length} success measures`,
-    body: ({ d, set, editing, ai }) => (
-      <>
-        <KvRow label="Planned start" ai={ai("start")}>
-          <Val
-            label="Planned start"
-            editing={editing}
-            kind="date"
-            value={d.start}
-            onChange={(v) => set({ start: v })}
-            placeholder="mm/dd/yyyy"
-          />
-        </KvRow>
-        <KvRow label="Target completion" ai={ai("target")}>
-          <Val
-            label="Target completion"
-            editing={editing}
-            kind="date"
-            value={d.target}
-            onChange={(v) => set({ target: v })}
-            placeholder="mm/dd/yyyy"
-          />
-        </KvRow>
-        <KvRow
-          label="Scope and measures"
-          ai={ai("background")}
-          top={!!d.background && editing}
-        >
-          <Val
-            label="Scope and measures"
-            editing={editing}
-            kind="area"
-            value={d.background}
-            onChange={(v) => set({ background: v })}
-            placeholder="Business case / background"
-          />
-        </KvRow>
-        <KvRow label="In scope" ai={ai("inScope")} top>
-          <Val
-            label="In scope"
-            editing={editing}
-            kind="area"
-            value={d.inScope}
-            onChange={(v) => set({ inScope: v })}
-            placeholder="Work this project covers"
-          />
-        </KvRow>
-        <KvRow label="Out of scope" ai={ai("outScope")} top>
-          <Val
-            label="Out of scope"
-            editing={editing}
-            kind="area"
-            value={d.outScope}
-            onChange={(v) => set({ outScope: v })}
-            placeholder="Work explicitly excluded"
-          />
-        </KvRow>
-        <KvRow label="Expected outcome" ai={ai("deliverable")}>
-          <Val
-            label="Expected outcome"
-            editing={editing}
-            value={d.deliverable}
-            onChange={(v) => set({ deliverable: v })}
-            placeholder="e.g. Validated technology option"
-          />
-        </KvRow>
-        <KvRow label="Success measures" ai={ai("measures")} top>
-          <Val
-            label="Success measures"
-            editing={editing}
-            kind="area"
-            value={d.measures}
-            onChange={(v) => set({ measures: v })}
-            placeholder="Measurable indicators, one per line"
-          />
-        </KvRow>
-      </>
-    ),
-    after: {
-      title: "Assumptions And Dependencies",
-      icon: HelpCircleIcon,
-      body: ({ d, set }) => (
+        </Panel>
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
+
+/** Figma 1.5 – Scope And Measures + Assumptions And Dependencies */
+function ScopeStep(c: StepCtx) {
+  const { d, set, editing, ai } = c;
+  return (
+    <Shell>
+      <Card
+        icon={BinocularsIcon}
+        title="Scope And Measures"
+        action={<EditButton editing={editing} onClick={c.toggleEdit} />}
+      >
+        <Panel>
+          <KvRow label="Planned start" ai={ai("start")}>
+            <Val
+              label="Planned start"
+              editing={editing}
+              kind="date"
+              value={d.start}
+              onChange={(v) => set({ start: v })}
+              placeholder="mm/dd/yyyy"
+            />
+          </KvRow>
+          <KvRow label="Target completion" ai={ai("target")}>
+            <Val
+              label="Target completion"
+              editing={editing}
+              kind="date"
+              value={d.target}
+              onChange={(v) => set({ target: v })}
+              placeholder="mm/dd/yyyy"
+            />
+          </KvRow>
+          <KvRow
+            label="Business case / background"
+            ai={ai("background")}
+            top={editing && !!d.background}
+          >
+            <Val
+              label="Business case / background"
+              editing={editing}
+              kind="area"
+              value={d.background}
+              onChange={(v) => set({ background: v })}
+              placeholder="Business case / background"
+            />
+          </KvRow>
+          <KvRow label="In scope" ai={ai("inScope")} top>
+            <Val
+              label="In scope"
+              editing={editing}
+              kind="area"
+              value={d.inScope}
+              onChange={(v) => set({ inScope: v })}
+              placeholder="Work this project covers"
+            />
+          </KvRow>
+          <KvRow label="Out of scope" ai={ai("outScope")} top>
+            <Val
+              label="Out of scope"
+              editing={editing}
+              kind="area"
+              value={d.outScope}
+              onChange={(v) => set({ outScope: v })}
+              placeholder="Work explicitly excluded"
+            />
+          </KvRow>
+          <KvRow label="Expected outcome" ai={ai("deliverable")}>
+            <Val
+              label="Expected outcome"
+              editing={editing}
+              value={d.deliverable}
+              onChange={(v) => set({ deliverable: v })}
+              placeholder="Measurable indicators, one per line"
+            />
+          </KvRow>
+          <KvRow label="Success measures" ai={ai("measures")} top>
+            <Val
+              label="Success measures"
+              editing={editing}
+              kind="area"
+              value={d.measures}
+              onChange={(v) => set({ measures: v })}
+              placeholder="e.g. Validated technology option"
+            />
+          </KvRow>
+        </Panel>
+      </Card>
+      <Card icon={HelpCircleIcon} title="Assumptions And Dependencies">
         <div className="flex flex-col gap-2.5">
-          <OpenArea
+          <Block
+            label="Assumptions and constraints"
+            editing
             value={d.assumptions}
             onChange={(v) => set({ assumptions: v })}
             placeholder="Assumptions and constraints"
+            rows={2}
           />
-          <OpenArea
+          <Block
+            label="External dependencies"
+            editing
             value={d.dependencies}
             onChange={(v) => set({ dependencies: v })}
             placeholder="External dependencies"
+            rows={2}
           />
         </div>
-      ),
-    },
-  },
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
 
-  /* ---------- 2 Organization ---------- */
-  {
-    id: "people",
-    section: "Organization",
-    title: "People And Oversight",
-    icon: UserGroupIcon,
-    validate: (d) =>
-      d.sponsor && d.lead
-        ? null
-        : "Choose an executive sponsor and a project lead.",
-    summary: (d) =>
-      `Sponsor: ${orDash(d.sponsor)} · Lead: ${orDash(d.lead)} · Steering: ${d.steering.length ? d.steering.join(", ") : "Not assigned"}`,
-    body: ({ d, set, editing, ai }) => (
-      <>
-        <KvRow label="Executive sponsor" ai={ai("sponsor")}>
+/** Two-line team cell: "Discovery Research / Department lead: Sarah Chen" + "RND-DIS · 1 people" */
+function TeamLine({ id }: { id: string }) {
+  const t = teamInfo(id);
+  if (!t) return <span>{id}</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-4">
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-sm leading-[1.5] font-semibold">
+          {t.name}
+        </span>
+        <span className="truncate text-xs leading-[1.5] text-body">
+          Department lead: {t.lead}
+        </span>
+      </span>
+      <span className="shrink-0 text-xs text-[#101D37]">
+        {t.code} · {t.people} people
+      </span>
+    </span>
+  );
+}
+
+/** Select box with the label above (Figma "Executive Sponsor" / "Project Lead") */
+function PersonSelect({
+  label,
+  value,
+  onChange,
+  editing,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  editing: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <span className={LABEL}>{label}</span>
+      <div className="flex min-h-[62px] items-center rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 focus-within:border-blue">
+        {editing ? (
           <Val
-            label="Executive sponsor"
-            editing={editing}
+            label={label}
+            editing
             kind="select"
             options={names}
-            value={d.sponsor}
-            onChange={(v) => set({ sponsor: v })}
+            value={value}
+            onChange={onChange}
             placeholder="Choose person"
           />
-        </KvRow>
-        <KvRow label="Project lead" ai={ai("lead")}>
-          <Val
-            label="Project lead"
-            editing={editing}
-            kind="select"
-            options={names}
-            value={d.lead}
-            onChange={(v) => set({ lead: v })}
-            placeholder="Choose person"
-          />
-        </KvRow>
-        <KvRow label="Steering group" top={editing}>
-          <PillSet
-            editing={editing}
-            options={names}
-            values={d.steering}
-            onChange={(v) => set({ steering: v })}
-            empty="Not assigned (optional)"
-          />
-        </KvRow>
-        <KvRow label="Stakeholders" ai={ai("stakeholders")}>
-          <Val
-            label="Stakeholders"
-            editing={editing}
-            value={d.stakeholders}
-            onChange={(v) => set({ stakeholders: v })}
-            placeholder="e.g. Plant operations board, technology partner"
-          />
-        </KvRow>
-      </>
-    ),
-  },
-  {
-    id: "team",
-    section: "Organization",
-    title: "Departments And Teams",
-    icon: Building03Icon,
-    validate: (d) => {
-      if (!d.departments.length) return "Select at least one department.";
-      if (d.teamMode !== TEAM_MODES[0].value) return null;
-      const miss = d.departments.find(
-        (dep) => !d.teams.some((t) => t.startsWith(dep + " ·")),
-      );
-      return miss
-        ? `${miss} needs at least one team. Use Edit Details to pick one.`
-        : null;
-    },
-    summary: (d) =>
-      `${d.departments.join(", ")} · ${d.teamMode === TEAM_MODES[0].value ? `${d.teams.length} teams selected` : "Leads assign teams later"}`,
-    body: ({ d, set, editing, ai }) => (
-      <>
-        <KvRow label="Departments" ai={ai("departments")} top={editing}>
-          <PillSet
-            editing={editing}
-            options={DEPARTMENTS}
-            values={d.departments}
-            onChange={(v) =>
-              set((p) => {
-                const kept = p.workstreams.filter((w) =>
-                  v.includes(w.department),
-                );
-                const first = DEPARTMENTS.find((x) => v.includes(x));
-                const added =
-                  kept.length || !first
-                    ? []
-                    : [
-                        {
-                          ...emptyWorkstream(first),
-                          ...(WS_BY_DEPT[first] ?? {}),
-                        },
-                      ];
-                return {
-                  departments: DEPARTMENTS.filter((x) => v.includes(x)),
-                  teams: p.teams.filter((t) =>
-                    v.some((dep) => t.startsWith(dep + " ·")),
-                  ),
-                  workstreams: [...kept, ...added],
-                };
-              })
-            }
-          />
-        </KvRow>
-        <KvRow label="Team assignment">
-          <Val
-            label="Team assignment"
-            editing={editing}
-            kind="select"
-            options={TEAM_MODES.map((m) => m.value)}
-            value={d.teamMode}
-            onChange={(v) => set({ teamMode: v })}
-          />
-        </KvRow>
-        {d.teamMode === TEAM_MODES[0].value &&
-          d.departments.map((dep) => (
-            <KvRow
-              key={dep}
-              label={<span className="text-base">{dep}</span>}
-              top={editing}
-            >
-              <PillSet
-                editing={editing}
-                options={teamsFor(dep)}
-                values={d.teams.filter((t) => t.startsWith(dep + " ·"))}
-                onChange={(v) =>
-                  set((p) => ({
-                    teams: [
-                      ...p.teams.filter((t) => !t.startsWith(dep + " ·")),
-                      ...v,
-                    ],
-                  }))
-                }
-                empty="No team yet: Edit Details to choose"
-              />
-            </KvRow>
-          ))}
-      </>
-    ),
-  },
-
-  /* ---------- 3 Delivery ---------- */
-  {
-    id: "workstreams",
-    section: "Delivery",
-    title: "Workstreams",
-    icon: Route01Icon,
-    validate: (d) =>
-      d.workstreams.some((w) => w.name.trim() && w.owner && w.output.trim())
-        ? null
-        : "Add at least one workstream with a name, owner and expected output (Edit Details).",
-    summary: (d) =>
-      d.workstreams.map((w) => w.name || "Untitled").join(" · ") || "None",
-    body: (c) => (
-      <ItemList
-        c={c}
-        items={c.d.workstreams}
-        label="Workstream"
-        icon={Route01Icon}
-        empty="No workstreams yet."
-        make={() => emptyWorkstream(c.d.departments[0])}
-        onChange={(workstreams) => c.set({ workstreams })}
-        row={(w, up) => {
-          const ai = c.ai("workstreams");
-          const e = c.editing;
-          return (
-            <>
-              <KvRow grey label="Workstream" ai={ai && !!w.name}>
-                <Val
-                  label="Workstream"
-                  editing={e}
-                  value={w.name}
-                  onChange={(v) => up({ name: v })}
-                  placeholder="e.g. Technology validation"
-                />
-              </KvRow>
-              <KvRow grey label="Department">
-                <Val
-                  label="Department"
-                  editing={e}
-                  kind="select"
-                  options={
-                    c.d.departments.length ? c.d.departments : DEPARTMENTS
-                  }
-                  value={w.department}
-                  onChange={(v) => up({ department: v, team: "" })}
-                />
-              </KvRow>
-              <KvRow grey label="Expected output" ai={ai && !!w.output}>
-                <Val
-                  label="Expected output"
-                  editing={e}
-                  value={w.output}
-                  onChange={(v) => up({ output: v })}
-                  placeholder="What must this stream produce?"
-                />
-              </KvRow>
-              <KvRow grey label="Owner">
-                <Val
-                  label="Owner"
-                  editing={e}
-                  kind="select"
-                  options={names}
-                  value={w.owner}
-                  onChange={(v) => up({ owner: v })}
-                  placeholder="Choose person"
-                />
-              </KvRow>
-              <KvRow grey label="Reviewer">
-                <Val
-                  label="Reviewer"
-                  editing={e}
-                  kind="select"
-                  options={names.filter((n) => n !== w.owner)}
-                  value={w.reviewer}
-                  onChange={(v) => up({ reviewer: v })}
-                  placeholder="Choose person"
-                />
-              </KvRow>
-              <KvRow grey label="Start / due">
-                {e ? (
-                  <span className="flex gap-3">
-                    <Val
-                      label="Start"
-                      editing
-                      kind="date"
-                      value={w.start}
-                      onChange={(v) => up({ start: v })}
-                    />
-                    <Val
-                      label="Due"
-                      editing
-                      kind="date"
-                      value={w.due}
-                      onChange={(v) => up({ due: v })}
-                    />
-                  </span>
-                ) : (
-                  <span className={w.start || w.due ? "" : "text-body"}>
-                    {w.start || w.due
-                      ? `${w.start ? showDate(w.start) : "TBD"} → ${w.due ? showDate(w.due) : "TBD"}`
-                      : "Not scheduled"}
-                  </span>
-                )}
-              </KvRow>
-            </>
-          );
-        }}
-      />
-    ),
-  },
-  {
-    id: "gates",
-    section: "Delivery",
-    title: "Decision Gates",
-    icon: Flag02Icon,
-    validate: (d) => {
-      if (!d.gates.some((g) => g.name.trim() && g.criteria.trim()))
-        return "Add at least one gate with acceptance criteria (Edit Details).";
-      const i = d.gates.findIndex((g) => !g.approver || !g.workstreams.length);
-      return i >= 0
-        ? `Gate ${i + 1} needs an approver and the workstreams it covers.`
-        : null;
-    },
-    summary: (d) =>
-      d.gates
-        .map((g) => `${g.name || "Untitled"} → ${g.approver || "No approver"}`)
-        .join(" · ") || "None",
-    body: (c) => (
-      <ItemList
-        c={c}
-        items={c.d.gates}
-        label="Gate"
-        icon={Flag02Icon}
-        empty="No decision gates yet. Use Edit Details to add one."
-        make={() => ({
-          ...emptyGate(),
-          name: c.d.gates.length ? "" : "Feasibility decision",
-        })}
-        onChange={(gates) => c.set({ gates })}
-        row={(g, up) => {
-          const e = c.editing;
-          const wsNames = c.d.workstreams.map(
-            (w, i) => w.name || `Workstream ${i + 1}`,
-          );
-          return (
-            <>
-              <KvRow grey label="Gate">
-                <Val
-                  label="Gate"
-                  editing={e}
-                  value={g.name}
-                  onChange={(v) => up({ name: v })}
-                  placeholder="e.g. Go / no-go for pilot"
-                />
-              </KvRow>
-              <KvRow grey label="Approver">
-                <Val
-                  label="Approver"
-                  editing={e}
-                  kind="select"
-                  options={names}
-                  value={g.approver}
-                  onChange={(v) => up({ approver: v })}
-                  placeholder="Choose person"
-                />
-              </KvRow>
-              <KvRow grey label="Planned date">
-                <Val
-                  label="Planned date"
-                  editing={e}
-                  kind="date"
-                  value={g.date}
-                  onChange={(v) => up({ date: v })}
-                  placeholder="Not set"
-                />
-              </KvRow>
-              <KvRow grey label="Covers" top={e}>
-                <PillSet
-                  editing={e}
-                  options={wsNames}
-                  values={g.workstreams}
-                  onChange={(v) => up({ workstreams: v })}
-                />
-              </KvRow>
-              <KvRow grey label="Acceptance criteria" top>
-                <Val
-                  label="Acceptance criteria"
-                  editing={e}
-                  kind="area"
-                  value={g.criteria}
-                  onChange={(v) => up({ criteria: v })}
-                  placeholder="What must be true to pass this gate?"
-                />
-              </KvRow>
-            </>
-          );
-        }}
-      />
-    ),
-  },
-  {
-    id: "risks",
-    section: "Delivery",
-    title: "Risk Register",
-    icon: Alert02Icon,
-    validate: (d) =>
-      d.risks.some((r) => r.risk.trim()) || d.noRiskReason.trim()
-        ? null
-        : "Add a risk, or explain why no material risks are identified.",
-    summary: (d) => {
-      const n = d.risks.filter((r) => r.risk.trim()).length;
-      return n
-        ? `${n} risk${n === 1 ? "" : "s"} recorded`
-        : `No risks: ${d.noRiskReason.trim()}`;
-    },
-    body: (c) => (
-      <>
-        <ItemList
-          c={c}
-          items={c.d.risks}
-          label="Risk"
-          icon={Alert02Icon}
-          empty="No risks recorded yet."
-          make={emptyRisk}
-          onChange={(risks) => c.set({ risks })}
-          row={(r, up) => {
-            const e = c.editing;
-            return (
-              <>
-                <KvRow grey label="Risk">
-                  <Val
-                    label="Risk"
-                    editing={e}
-                    value={r.risk}
-                    onChange={(v) => up({ risk: v })}
-                    placeholder="What could go wrong?"
-                  />
-                </KvRow>
-                <KvRow grey label="Owner">
-                  <Val
-                    label="Owner"
-                    editing={e}
-                    kind="select"
-                    options={names}
-                    value={r.owner}
-                    onChange={(v) => up({ owner: v })}
-                    placeholder="Choose person"
-                  />
-                </KvRow>
-                <KvRow grey label="Severity">
-                  <Val
-                    label="Severity"
-                    editing={e}
-                    kind="select"
-                    options={SEVERITIES}
-                    value={r.severity}
-                    onChange={(v) => up({ severity: v })}
-                    tone={r.severity === "High" ? "text-[#F04438]" : undefined}
-                  />
-                </KvRow>
-                <KvRow grey label="Response">
-                  <Val
-                    label="Response"
-                    editing={e}
-                    value={r.response}
-                    onChange={(v) => up({ response: v })}
-                    placeholder="How will it be reduced or handled?"
-                  />
-                </KvRow>
-              </>
-            );
-          }}
-        />
-        {!c.d.risks.length && (
-          <SubCard icon={HelpCircleIcon} title="No Material Risks?">
-            <Block
-              label="Why no material risks are identified"
-              editing
-              value={c.d.noRiskReason}
-              onChange={(v) => c.set({ noRiskReason: v })}
-              placeholder="Explain why no material risks are currently identified"
+        ) : (
+          <span className="flex w-full items-center justify-between gap-2 text-base text-[#101D37]">
+            {value || <span className="text-body">Choose person</span>}
+            <Icon
+              icon={huge(ArrowDown01Icon)}
+              size={16}
+              className="text-body"
             />
-          </SubCard>
+          </span>
         )}
-      </>
-    ),
-  },
-  {
-    id: "planning",
-    section: "Delivery",
-    title: "Budget, Capacity And Reporting",
-    icon: Wallet01Icon,
-    summary: (d) =>
-      [
-        d.approach,
-        `${d.reporting} reporting`,
-        d.budget.trim() && `${d.currency} ${d.budget.trim()}`,
-        d.resources.trim(),
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    body: ({ d, set, editing }) => (
-      <>
-        <KvRow label="Delivery approach">
-          <Val
-            label="Delivery approach"
-            editing={editing}
-            kind="select"
-            options={APPROACHES}
-            value={d.approach}
-            onChange={(v) => set({ approach: v })}
-          />
-        </KvRow>
-        <KvRow label="Reporting">
-          <Val
-            label="Reporting"
-            editing={editing}
-            kind="select"
-            options={REPORTING}
-            value={d.reporting}
-            onChange={(v) => set({ reporting: v })}
-          />
-        </KvRow>
-        <KvRow label="Indicative budget">
-          {editing ? (
-            <span className="flex items-center gap-3">
-              <Val
-                label="Budget amount"
-                editing
-                value={d.budget}
-                onChange={(v) => set({ budget: v })}
-                placeholder="Amount (optional)"
-              />
-              <span className="w-20 shrink-0">
-                <Val
-                  label="Currency"
-                  editing
-                  kind="select"
-                  options={CURRENCIES}
-                  value={d.currency}
-                  onChange={(v) => set({ currency: v })}
-                />
-              </span>
-            </span>
-          ) : (
-            <Val
-              label="Budget"
-              editing={false}
-              value={d.budget.trim() ? `${d.currency} ${d.budget.trim()}` : ""}
-              onChange={() => {}}
-              placeholder="Optional"
-            />
-          )}
-        </KvRow>
-        <KvRow label="Cost centre">
-          <Val
-            label="Cost centre"
-            editing={editing}
-            value={d.costCentre}
-            onChange={(v) => set({ costCentre: v })}
-            placeholder="Optional funding reference"
-          />
-        </KvRow>
-        <KvRow label="Resources">
-          <Val
-            label="Resources"
-            editing={editing}
-            value={d.resources}
-            onChange={(v) => set({ resources: v })}
-            placeholder="e.g. 4 FTE across 3 functions"
-          />
-        </KvRow>
-      </>
-    ),
-  },
+      </div>
+    </div>
+  );
+}
 
-  /* ---------- 4 Controls ---------- */
-  {
-    id: "controls",
-    section: "Controls",
-    title: "Access And Controls",
-    icon: Shield01Icon,
-    summary: (d) =>
-      [
-        d.controlsMode === "Customize"
-          ? `${d.visibility} · ${d.classification} · Changes: ${d.changeAuth}`
-          : "Recommended controls",
-        d.governance.startsWith("Regulated") &&
-          `${d.regControls.length} regulated controls · Quality lead: ${d.qualityLead || "Not assigned"}`,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    body: ({ d, set, editing }) => {
-      const recommended = d.controlsMode !== "Customize";
-      return (
-        <>
-          <KvRow label="Controls" ai={recommended}>
-            <Val
-              label="Controls"
+/** Figma 2 – Accountability And Organization */
+function OrganizationStep(c: StepCtx) {
+  const { d, set, editing, ai } = c;
+  const assignNow = d.teamMode === TEAM_MODES[0].value;
+  return (
+    <Shell>
+      <Card
+        icon={BinocularsIcon}
+        title="Accountability And Organization"
+        action={<EditButton editing={editing} onClick={c.toggleEdit} />}
+      >
+        <Panel>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <PersonSelect
+              label="Executive Sponsor"
+              value={d.sponsor}
               editing={editing}
-              kind="select"
-              options={["Use recommended", "Customize"]}
-              value={recommended ? "Use recommended" : "Customize"}
+              onChange={(v) => set({ sponsor: v })}
+            />
+            <PersonSelect
+              label="Project Lead"
+              value={d.lead}
+              editing={editing}
+              onChange={(v) => set({ lead: v })}
+            />
+          </div>
+          <KvRow
+            wide
+            label="Participating Departments"
+            ai={ai("departments")}
+            top={editing}
+          >
+            <PillSet
+              editing={editing}
+              options={DEPARTMENTS}
+              values={d.departments}
               onChange={(v) =>
-                set((p) =>
-                  v === "Use recommended"
-                    ? { controlsMode: v, ...recommendedControls(p.governance) }
-                    : { controlsMode: v },
-                )
+                set((p) => {
+                  const kept = p.workstreams.filter((w) =>
+                    v.includes(w.department),
+                  );
+                  const first = DEPARTMENTS.find((x) => v.includes(x));
+                  const added =
+                    kept.length || !first
+                      ? []
+                      : [
+                          {
+                            ...emptyWorkstream(first),
+                            ...(WS_BY_DEPT[first] ?? {}),
+                          },
+                        ];
+                  return {
+                    departments: DEPARTMENTS.filter((x) => v.includes(x)),
+                    teams: p.teams.filter((t) =>
+                      v.some((dep) => t.startsWith(dep + " ·")),
+                    ),
+                    workstreams: [...kept, ...added],
+                  };
+                })
               }
             />
           </KvRow>
+          <KvRow wide label="Team Assignment" ai={ai("teamMode")}>
+            <Val
+              label="Team Assignment"
+              editing={editing}
+              kind="select"
+              options={TEAM_MODES.map((m) => m.value)}
+              value={d.teamMode}
+              onChange={(v) => set({ teamMode: v })}
+            />
+          </KvRow>
+          {assignNow && (
+            <KvRow
+              wide
+              label="Participating Teams"
+              ai={ai("teams")}
+              top={editing || d.teams.length > 1}
+            >
+              {editing ? (
+                <span className="flex flex-col gap-2 py-0.5">
+                  {d.departments.map((dep) => (
+                    <span key={dep} className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-body">
+                        {dep}
+                      </span>
+                      <PillSet
+                        editing
+                        options={teamsFor(dep)}
+                        values={d.teams.filter((t) => t.startsWith(dep + " ·"))}
+                        show={(v) => v.split(" · ")[1]}
+                        onChange={(v) =>
+                          set((p) => ({
+                            teams: [
+                              ...p.teams.filter(
+                                (t) => !t.startsWith(dep + " ·"),
+                              ),
+                              ...v,
+                            ],
+                          }))
+                        }
+                      />
+                    </span>
+                  ))}
+                </span>
+              ) : d.teams.length ? (
+                <span className="flex flex-col gap-2">
+                  {d.teams.map((t) => (
+                    <TeamLine key={t} id={t} />
+                  ))}
+                </span>
+              ) : (
+                <span className="text-body">No team selected yet</span>
+              )}
+            </KvRow>
+          )}
+          <SubCard
+            title="Steering Group And Stakeholders"
+            desc="People who receive governance updates and participate in programme decisions."
+          >
+            {editing ? (
+              <PillSet
+                editing
+                options={names}
+                values={d.steering}
+                onChange={(v) => set({ steering: v })}
+              />
+            ) : d.steering.length ? (
+              d.steering.map((n) => (
+                <div
+                  key={n}
+                  className="flex min-h-[46px] items-center justify-between gap-2 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] py-1.5 pr-1.5 pl-4 text-base text-[#101D37]"
+                >
+                  {n}
+                  {ai("steering") && <AiChip />}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-body">No one added yet.</p>
+            )}
+          </SubCard>
+          <SubCard title="Stakeholder And Decision Notes">
+            <Block
+              label="Stakeholder and decision notes"
+              editing={editing}
+              value={d.decisionNotes}
+              onChange={(v) => set({ decisionNotes: v })}
+              placeholder="Write here"
+              rows={2}
+            />
+          </SubCard>
+          <Stacked label="External Organizations">
+            <TextBox
+              label="External organizations"
+              editing={editing}
+              value={d.externalOrgs}
+              onChange={(v) => set({ externalOrgs: v })}
+              placeholder="Comma-separated; access is assigned separately"
+            />
+          </Stacked>
+        </Panel>
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
+
+/** Figma 3 – Workstreams + Decision Gates */
+function DeliveryStep(c: StepCtx) {
+  const { d, set, ai } = c;
+  const aiWs = ai("workstreams");
+  const aiGates = ai("gates");
+  const setWs = (i: number, p: Partial<Workstream>) =>
+    set((x) => ({ workstreams: upd(x.workstreams, i, p) }));
+  const setGate = (i: number, p: Partial<Gate>) =>
+    set((x) => ({ gates: upd(x.gates, i, p) }));
+  return (
+    <Shell>
+      <Card
+        icon={BinocularsIcon}
+        title="Workstreams"
+        action={
+          <AddButton
+            label="Add Workstream"
+            onClick={() =>
+              set((x) => ({
+                workstreams: [
+                  ...x.workstreams,
+                  emptyWorkstream(x.departments[0]),
+                ],
+              }))
+            }
+          />
+        }
+      >
+        {d.workstreams.length === 0 && (
+          <p className="text-sm text-body">
+            No workstreams yet. Add one to continue.
+          </p>
+        )}
+        {d.workstreams.map((w, i) => (
+          <WorkstreamItem
+            key={i}
+            i={i}
+            w={w}
+            d={d}
+            ai={aiWs}
+            up={(p) => setWs(i, p)}
+            remove={() =>
+              set((x) => ({
+                workstreams: x.workstreams.filter((_, j) => j !== i),
+              }))
+            }
+          />
+        ))}
+      </Card>
+      <Card
+        icon={BinocularsIcon}
+        title="Decision Gates"
+        action={
+          <AddButton
+            label="Add Gate"
+            onClick={() => set((x) => ({ gates: [...x.gates, emptyGate()] }))}
+          />
+        }
+      >
+        {d.gates.length === 0 && (
+          <p className="text-sm text-body">
+            No decision gates yet. Add one to continue.
+          </p>
+        )}
+        {d.gates.map((g, i) => (
+          <Item
+            key={i}
+            title={`Decision Gate ${i + 1}`}
+            onRemove={() =>
+              set((x) => ({ gates: x.gates.filter((_, j) => j !== i) }))
+            }
+          >
+            <KvRow wide label="Decision Gate" ai={aiGates && !!g.name}>
+              <Val
+                label="Decision Gate"
+                editing
+                value={g.name}
+                onChange={(v) => setGate(i, { name: v })}
+                placeholder="e.g. Design Approval"
+              />
+            </KvRow>
+            <KvRow wide label="Target Date" ai={aiGates && !!g.date}>
+              <Val
+                label="Target Date"
+                editing
+                kind="date"
+                value={g.date}
+                onChange={(v) => setGate(i, { date: v })}
+              />
+            </KvRow>
+            <KvRow wide label="Decision Owner" ai={aiGates && !!g.owner}>
+              <Val
+                label="Decision Owner"
+                editing
+                kind="select"
+                options={names}
+                value={g.owner}
+                onChange={(v) => setGate(i, { owner: v })}
+                placeholder="Choose person"
+              />
+            </KvRow>
+            <KvRow wide label="Approver" ai={aiGates && !!g.approver}>
+              <Val
+                label="Approver"
+                editing
+                kind="select"
+                options={names}
+                value={g.approver}
+                onChange={(v) => setGate(i, { approver: v })}
+                placeholder="Choose person"
+              />
+            </KvRow>
+            <Stacked label="Evidence And Acceptance Criteria">
+              <TextBox
+                label="Evidence and acceptance criteria"
+                editing
+                value={g.criteria}
+                onChange={(v) => setGate(i, { criteria: v })}
+                placeholder="Write here"
+              />
+            </Stacked>
+            <Stacked label="Gate Scope">
+              {(d.workstreams.length ? d.workstreams : [emptyWorkstream()]).map(
+                (w, j) => {
+                  const n = wsName(w, j);
+                  return (
+                    <Check
+                      key={j}
+                      label={n}
+                      disabled={!d.workstreams.length}
+                      checked={g.workstreams.includes(n)}
+                      onChange={(on) =>
+                        setGate(i, {
+                          workstreams: on
+                            ? [...g.workstreams, n]
+                            : g.workstreams.filter((x) => x !== n),
+                        })
+                      }
+                    />
+                  );
+                },
+              )}
+              <Check
+                label="Require all linked research packages to be accepted"
+                desc="Enable for completion gates; leave off for earlier design or feasibility decisions."
+                checked={g.requireAll}
+                onChange={(on) => setGate(i, { requireAll: on })}
+              />
+            </Stacked>
+          </Item>
+        ))}
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
+
+function WorkstreamItem({
+  i,
+  w,
+  d,
+  ai,
+  up,
+  remove,
+}: {
+  i: number;
+  w: Workstream;
+  d: Draft;
+  ai: boolean;
+  up: (p: Partial<Workstream>) => void;
+  remove: () => void;
+}) {
+  const [open, setOpen] = useState(!!w.dependencies);
+  return (
+    <Item title={`Workstream ${i + 1}`} onRemove={remove}>
+      <KvRow wide label="Workstream" ai={ai && !!w.name}>
+        <Val
+          label="Workstream"
+          editing
+          value={w.name}
+          onChange={(v) => up({ name: v })}
+          placeholder="e.g. Technology validation"
+        />
+      </KvRow>
+      <KvRow wide label="Department" ai={ai && !!w.department}>
+        <Val
+          label="Department"
+          editing
+          kind="select"
+          options={d.departments.length ? d.departments : DEPARTMENTS}
+          value={w.department}
+          onChange={(v) => up({ department: v, team: "" })}
+        />
+      </KvRow>
+      <KvRow wide label="Responsible Team" ai={ai && !!w.team}>
+        <Val
+          label="Responsible Team"
+          editing
+          kind="select"
+          options={teamsFor(w.department).map((t) => t.split(" · ")[1])}
+          value={w.team.split(" · ")[1] ?? ""}
+          onChange={(v) => up({ team: `${w.department} · ${v}` })}
+          placeholder="Choose Team"
+        />
+      </KvRow>
+      <KvRow wide label="Expected Output" ai={ai && !!w.output}>
+        <Val
+          label="Expected Output"
+          editing
+          value={w.output}
+          onChange={(v) => up({ output: v })}
+          placeholder="What must this stream produce?"
+        />
+      </KvRow>
+      <KvRow wide label="Accountable Owner · Team Member" ai={ai && !!w.owner}>
+        <Val
+          label="Accountable Owner"
+          editing
+          kind="select"
+          options={names}
+          value={w.owner}
+          onChange={(v) => up({ owner: v })}
+          placeholder="Choose person"
+        />
+      </KvRow>
+      <KvRow wide label="Independent Reviewer" ai={ai && !!w.reviewer}>
+        <Val
+          label="Independent Reviewer"
+          editing
+          kind="select"
+          options={names.filter((n) => n !== w.owner)}
+          value={w.reviewer}
+          onChange={(v) => up({ reviewer: v })}
+          placeholder="Choose person"
+        />
+      </KvRow>
+      <KvRow wide label="Start Date" ai={ai && !!w.start}>
+        <Val
+          label="Start Date"
+          editing
+          kind="date"
+          value={w.start}
+          onChange={(v) => up({ start: v })}
+        />
+      </KvRow>
+      <KvRow wide label="Due Date" ai={ai && !!w.due}>
+        <Val
+          label="Due Date"
+          editing
+          kind="date"
+          value={w.due}
+          onChange={(v) => up({ due: v })}
+        />
+      </KvRow>
+      <div className="rounded-[14px] border border-[#EDEDF0] bg-white">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="flex min-h-[62px] w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm leading-[1.5] tracking-[-0.02em] text-[#101D37]"
+        >
+          Dependencies and required plans
+          <Icon
+            icon={huge(ArrowDown01Icon)}
+            size={16}
+            className={`text-body transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+        {open && (
+          <div className="border-t border-[#EDEDF0] px-4 py-3">
+            <Val
+              label="Dependencies and required plans"
+              editing
+              kind="area"
+              value={w.dependencies}
+              onChange={(v) => up({ dependencies: v })}
+              placeholder="One per line, e.g. Needs supplier data from Procurement"
+            />
+          </div>
+        )}
+      </div>
+    </Item>
+  );
+}
+
+/** Figma 3.5 – Decision Gates (scope + evidence), Risk Register, Assessment, Planning Assumptions */
+function Delivery2Step(c: StepCtx) {
+  const { d, set, ai } = c;
+  const g = d.gates[0];
+  const aiRisk = ai("risks");
+  const setRisk = (i: number, p: Partial<Risk>) =>
+    set((x) => ({ risks: upd(x.risks, i, p) }));
+  return (
+    <Shell>
+      <Card
+        icon={BinocularsIcon}
+        title="Decision Gates"
+        action={
+          <AddButton
+            label="Add Gate"
+            onClick={() => set((x) => ({ gates: [...x.gates, emptyGate()] }))}
+          />
+        }
+      >
+        <Panel>
+          {g ? (
+            <>
+              <KvRow
+                wide
+                label="Gate Scope"
+                ai={ai("gates") && g.workstreams.length > 0}
+              >
+                <span className={g.workstreams.length ? "" : "text-body"}>
+                  {g.workstreams.length
+                    ? g.workstreams.join(", ")
+                    : "Unnamed workstream"}
+                </span>
+              </KvRow>
+              <Stacked label="Evidence And Acceptance Criteria">
+                <TextBox
+                  label="Evidence and acceptance criteria"
+                  editing
+                  value={g.criteria}
+                  onChange={(v) =>
+                    set((x) => ({ gates: upd(x.gates, 0, { criteria: v }) }))
+                  }
+                  placeholder="Write here"
+                />
+              </Stacked>
+            </>
+          ) : (
+            <p className="text-sm text-body">
+              No decision gates yet. Go back to add one.
+            </p>
+          )}
+        </Panel>
+      </Card>
+      <Card
+        icon={BinocularsIcon}
+        title="Risk Register"
+        action={
+          <AddButton
+            label="Add Risk"
+            onClick={() => set((x) => ({ risks: [...x.risks, emptyRisk()] }))}
+          />
+        }
+      >
+        {d.risks.length === 0 && (
+          <p className="text-sm text-body">No risks recorded yet.</p>
+        )}
+        {d.risks.map((r, i) => (
+          <Item
+            key={i}
+            title={`Risk ${i + 1}`}
+            onRemove={() =>
+              set((x) => ({ risks: x.risks.filter((_, j) => j !== i) }))
+            }
+          >
+            <KvRow wide label="Risk Or Issue" ai={aiRisk && !!r.risk}>
+              <Val
+                label="Risk Or Issue"
+                editing
+                value={r.risk}
+                onChange={(v) => setRisk(i, { risk: v })}
+                placeholder="e.g. Supplier data arrives late"
+              />
+            </KvRow>
+            <KvRow wide label="Initial Rating" ai={aiRisk && !!r.severity}>
+              <Val
+                label="Initial Rating"
+                editing
+                kind="select"
+                options={SEVERITIES}
+                value={r.severity}
+                tone={r.severity === "High" ? "text-[#F04438]" : undefined}
+                onChange={(v) => setRisk(i, { severity: v })}
+              />
+            </KvRow>
+            <KvRow wide label="Risk Owner" ai={aiRisk && !!r.owner}>
+              <Val
+                label="Risk Owner"
+                editing
+                kind="select"
+                options={names}
+                value={r.owner}
+                onChange={(v) => setRisk(i, { owner: v })}
+                placeholder="Choose person"
+              />
+            </KvRow>
+            <KvRow
+              wide
+              label="Response / Mitigation"
+              ai={aiRisk && !!r.response}
+            >
+              <Val
+                label="Response / Mitigation"
+                editing
+                value={r.response}
+                onChange={(v) => setRisk(i, { response: v })}
+                placeholder="How will it be reduced or handled?"
+              />
+            </KvRow>
+          </Item>
+        ))}
+      </Card>
+      <Card icon={HelpCircleIcon} title="Assessment If No Risks Are Recorded">
+        <Block
+          label="Why no material risks are currently identified"
+          editing
+          value={d.noRiskReason}
+          onChange={(v) => set({ noRiskReason: v })}
+          placeholder="Why no material risks are currently identified"
+          rows={2}
+        />
+      </Card>
+      <Card icon={BinocularsIcon} title="Planning Assumptions">
+        <Panel>
+          <KvRow wide label="Delivery Approach" ai={ai("approach")}>
+            <Val
+              label="Delivery Approach"
+              editing
+              kind="select"
+              options={APPROACHES}
+              value={d.approach}
+              onChange={(v) => set({ approach: v })}
+            />
+          </KvRow>
+          <KvRow wide label="Governance Reporting" ai={ai("reporting")}>
+            <Val
+              label="Governance Reporting"
+              editing
+              kind="select"
+              options={REPORTING}
+              value={d.reporting}
+              onChange={(v) => set({ reporting: v })}
+            />
+          </KvRow>
+          <KvRow wide label="Indicative Budget" ai={ai("budget")}>
+            <Val
+              label="Indicative Budget"
+              editing
+              value={d.budget}
+              onChange={(v) => set({ budget: v })}
+              placeholder="Amount"
+            />
+          </KvRow>
+          <KvRow wide label="Currency" ai={ai("currency")}>
+            <Val
+              label="Currency"
+              editing
+              kind="select"
+              options={CURRENCIES}
+              value={d.currency}
+              onChange={(v) => set({ currency: v })}
+            />
+          </KvRow>
+          <KvRow
+            wide
+            label="Cost Centre / Funding Reference"
+            ai={ai("costCentre")}
+          >
+            <Val
+              label="Cost Centre / Funding Reference"
+              editing
+              value={d.costCentre}
+              onChange={(v) => set({ costCentre: v })}
+              placeholder="Optional"
+            />
+          </KvRow>
+          <KvRow wide label="Resource Allocation" ai={ai("resources")}>
+            <Val
+              label="Resource Allocation"
+              editing
+              value={d.resources}
+              onChange={(v) => set({ resources: v })}
+              placeholder="e.g. 4 FTE across 3 functions"
+            />
+          </KvRow>
+        </Panel>
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
+
+/** Figma 4 – Access And Controls, Quality And Assurance, Records And External Access */
+function ControlsStep(c: StepCtx) {
+  const { d, set, ai } = c;
+  const recommended = d.controlsMode !== "Customize";
+  return (
+    <Shell>
+      <Card icon={BinocularsIcon} title="Access And Controls">
+        <Panel>
           {CONTROL_FIELDS.map((f) => (
-            <KvRow key={f.key} label={f.label} ai={recommended}>
+            <KvRow wide key={f.key} label={f.label} ai={recommended}>
               <Val
                 label={f.label}
-                editing={editing}
+                editing
                 kind="select"
                 options={f.options}
                 value={d[f.key]}
@@ -1229,88 +1573,478 @@ export const CARDS: CardDef[] = [
               />
             </KvRow>
           ))}
-          {d.governance.startsWith("Regulated") && (
-            <SubCard icon={Shield01Icon} title="Regulated Work">
-              <div className="flex flex-col gap-2.5">
-                <KvRow grey label="Standards">
-                  <Val
-                    label="Standards"
-                    editing={editing}
-                    value={d.standards}
-                    onChange={(v) => set({ standards: v })}
-                    placeholder="e.g. ISO 9001"
+        </Panel>
+      </Card>
+      <Card icon={HelpCircleIcon} title="Quality And Assurance">
+        <Panel>
+          <KvRow wide label="Quality / Assurance Lead" ai={ai("qualityLead")}>
+            <Val
+              label="Quality / Assurance Lead"
+              editing
+              kind="select"
+              options={names}
+              value={d.qualityLead}
+              onChange={(v) => set({ qualityLead: v })}
+              placeholder="Not assigned"
+            />
+          </KvRow>
+          <KvRow wide label="Gate Approval Rule" ai={ai("gateRule")}>
+            <Val
+              label="Gate Approval Rule"
+              editing
+              kind="select"
+              options={GATE_RULES}
+              value={d.gateRule}
+              onChange={(v) => set({ gateRule: v })}
+            />
+          </KvRow>
+          <Stacked label="Applicable Standards / Regulatory Basis">
+            <Block
+              white
+              label="Applicable standards"
+              editing
+              value={d.standards}
+              onChange={(v) => set({ standards: v })}
+              placeholder="Enter only standards confirmed relevant by the quality or regulatory team"
+              rows={2}
+            />
+          </Stacked>
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {REG_CONTROLS.map((r) => (
+              <Check
+                key={r}
+                label={r}
+                checked={d.regControls.includes(r)}
+                onChange={(on) =>
+                  set((x) => ({
+                    regControls: on
+                      ? [...x.regControls, r]
+                      : x.regControls.filter((y) => y !== r),
+                  }))
+                }
+              />
+            ))}
+          </div>
+        </Panel>
+      </Card>
+      <Card icon={BinocularsIcon} title="Records And External Access">
+        <Panel>
+          <KvRow wide label="External Collaboration" ai={ai("externalAccess")}>
+            <Val
+              label="External Collaboration"
+              editing
+              kind="select"
+              options={EXTERNAL_ACCESS.map((x) => x.value)}
+              value={d.externalAccess}
+              onChange={(v) => set({ externalAccess: v })}
+            />
+          </KvRow>
+          <KvRow wide label="Data Handling Region" ai={ai("dataLocation")}>
+            <Val
+              label="Data Handling Region"
+              editing
+              value={d.dataLocation}
+              onChange={(v) => set({ dataLocation: v })}
+              placeholder="e.g. EU, UK, US"
+            />
+          </KvRow>
+          <KvRow wide label="Retention Requirement" ai={ai("retention")}>
+            <Val
+              label="Retention Requirement"
+              editing
+              value={d.retention}
+              onChange={(v) => set({ retention: v })}
+              placeholder="e.g. 10 years; subject to policy"
+            />
+          </KvRow>
+        </Panel>
+        <Footer c={c} />
+      </Card>
+    </Shell>
+  );
+}
+
+/* ---------------- Figma 5 – Review Before Creation ---------------- */
+
+const title = (s: string) => s.replace(/\b\w/g, (ch) => ch.toUpperCase());
+const iso = (s: string) => s || "TBD";
+
+function MiniRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="flex min-h-[43px] items-center justify-between gap-1.5 rounded-xl border border-[#EDEDF0] bg-white px-4 py-2.5 text-sm leading-[1.5] tracking-[-0.02em]">
+      <span className="shrink-0 font-semibold text-[#101D37]">{label}</span>
+      <span
+        className={`min-w-0 text-right break-words ${tone ?? "text-[#101D37]"}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+const ACCESS_TEXT: Record<string, string> = {
+  Sponsor:
+    "Charter, decision gates and status reporting; approves gates and changes",
+  Lead: "Full project charter, team, plan and controls; manages scope, assignments and submissions",
+  Member:
+    "Assigned workstreams, research and team discussion; no access to controls",
+};
+
+export function ReviewStep(c: StepCtx) {
+  const { d } = c;
+  const missing = missingItems(d);
+  const [role, setRole] = useState<"Sponsor" | "Lead" | "Member" | "External">(
+    "Lead",
+  );
+  const people = d.teams.reduce((n, t) => n + (teamInfo(t)?.people ?? 0), 0);
+  const external =
+    d.externalAccess === "No external access"
+      ? "No access: this project is limited to people inside the organization"
+      : d.externalAccess === "Named external reviewers"
+        ? "Read and comment on shared research; no editing"
+        : "Contribute content to shared research; no access to controls";
+  return (
+    <Shell>
+      <Card icon={BinocularsIcon} title="Review Before Creation">
+        {missing.length > 0 && (
+          <div className="flex flex-col gap-2.5 rounded-2xl border-[0.3px] border-[#FF6720] bg-[#FBF1EF] p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.02)]">
+            <p className="flex items-center gap-2 text-lg leading-[1.5] font-semibold tracking-[-0.02em] text-[#FF6720]">
+              <Icon icon={huge(Alert02Icon)} size={18} stroke={1.6} />
+              {missing.length} {missing.length === 1 ? "Item" : "Items"} To
+              Complete
+            </p>
+            <ul className="flex flex-col">
+              {missing.map((m) => {
+                const [head, ...rest] = m.text.split(": ");
+                return (
+                  <li key={m.text}>
+                    <button
+                      type="button"
+                      onClick={() => c.jump(m.step)}
+                      className="text-left text-base leading-[1.5] tracking-[-0.02em] text-[#344054] hover:underline"
+                    >
+                      {rest.length ? (
+                        <>
+                          <span className="font-semibold text-[#101D37]">
+                            {head}:
+                          </span>{" "}
+                          {rest.join(": ")}
+                        </>
+                      ) : (
+                        m.text
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {missing.length === 0 && (
+          <p className="flex items-center gap-1.5 text-base font-medium text-[#2BCB23]">
+            <Icon icon={huge(Tick02Icon)} size={18} stroke={1.8} />
+            Everything required is in place.
+          </p>
+        )}
+      </Card>
+
+      <div className="flex flex-col gap-3 rounded-[20px] border border-[#EDEDF0] bg-[#E9EEFC] p-4">
+        <p className="flex items-center gap-1.5 text-sm leading-[1.5] font-semibold text-blue">
+          <Icon icon={huge(BinocularsIcon)} size={16} stroke={1.6} />
+          {d.governance.split(" /")[0]} Project
+        </p>
+        <div className="flex flex-col">
+          <p className="text-xl leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">
+            {d.name || "Untitled project"}
+          </p>
+          <p className="text-base leading-[1.5] tracking-[-0.02em] text-body">
+            {d.departments[0] ?? d.type}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[#DCE3F5] pt-2.5 text-base leading-[1.5] tracking-[-0.02em] text-body">
+          <span className="flex items-center gap-1.5">
+            <Icon icon={huge(Settings02Icon)} size={16} stroke={1.5} />
+            {d.type}
+          </span>
+          <span className="hidden h-4 w-px bg-[#D0D5DD] sm:block" />
+          <span className="flex items-center gap-1.5">
+            <Icon icon={huge(File02Icon)} size={16} stroke={1.5} />
+            {d.departments.length > 1
+              ? `${d.departments.length} departments`
+              : (d.departments[0] ?? "No department")}
+          </span>
+          <span className="hidden h-4 w-px bg-[#D0D5DD] sm:block" />
+          <span className="flex items-center gap-1.5">
+            <Icon icon={huge(Calendar03Icon)} size={16} stroke={1.5} />
+            {iso(d.start)} - {iso(d.target)}
+          </span>
+        </div>
+      </div>
+
+      <Card>
+        <Panel>
+          <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
+            <div className="flex flex-col gap-2.5">
+              <h4 className={H3}>Accountability</h4>
+              <MiniRow label="Sponsor" value={d.sponsor || "Not Assigned"} />
+              <MiniRow label="Project Lead" value={d.lead || "Not Assigned"} />
+              <MiniRow
+                label="Steering Group"
+                value={d.steering.length ? d.steering.join(", ") : "None"}
+              />
+              <MiniRow
+                label="Departments"
+                value={`${d.departments.length} ${d.departments.length === 1 ? "Department" : "Departments"}`}
+              />
+              <MiniRow
+                label="Assignment"
+                value={
+                  d.teamMode === TEAM_MODES[0].value
+                    ? "Teams Selected At Setup"
+                    : "Leads Assign Later"
+                }
+              />
+              <MiniRow
+                label="Teams"
+                value={
+                  d.teams.length ? `${d.teams.length} Selected` : "Pending"
+                }
+              />
+              <MiniRow
+                label="People"
+                value={`${people} Inherited From Teams`}
+              />
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <h4 className={H3}>Governance And Controls</h4>
+              <MiniRow
+                label="Priority"
+                value={d.priority}
+                tone={PRIORITY_TONE[d.priority] ?? "text-[#101D37]"}
+              />
+              <MiniRow
+                label="Approval"
+                value={title(d.approvals.replace(", then ", " → "))}
+              />
+              <MiniRow label="Changes" value={title(d.changeAuth)} />
+              <MiniRow label="Classification" value={d.classification} />
+              <MiniRow
+                label="Quality Lead"
+                value={d.qualityLead || "Not Specified"}
+              />
+              <MiniRow
+                label="External Access"
+                value={title(d.externalAccess)}
+              />
+            </div>
+          </div>
+        </Panel>
+      </Card>
+
+      <Card>
+        <Panel>
+          <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <h4 className={H3}>Workstreams-{d.workstreams.length}</h4>
+              {d.workstreams.length === 0 && (
+                <p className="text-sm text-body">None yet</p>
+              )}
+              {d.workstreams.map((w, i) => {
+                const deps = w.dependencies
+                  .split("\n")
+                  .filter((l) => l.trim()).length;
+                return (
+                  <div key={i} className="flex flex-col gap-1">
+                    <span className="text-sm font-semibold text-[#101D37]">
+                      {w.name || "Untitled"}
+                    </span>
+                    <MiniRow
+                      label={`${w.owner || "No Owner"} · Required Plans · ${deps} ${deps === 1 ? "Dependency" : "Dependencies"}`}
+                      value=""
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex flex-col gap-2">
+              <h4 className={H3}>Decision Gates-{d.gates.length}</h4>
+              {d.gates.length === 0 && (
+                <p className="text-sm text-body">None yet</p>
+              )}
+              {d.gates.map((g, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-[#101D37]">
+                    {g.name || "Untitled"}
+                  </span>
+                  <MiniRow
+                    label={`${g.owner || "No Owner"} · ${g.approver || "No Approver"} · ${g.date ? showDate(g.date) : "No Date"}`}
+                    value=""
                   />
-                </KvRow>
-                <KvRow grey label="Quality lead">
-                  <Val
-                    label="Quality lead"
-                    editing={editing}
-                    kind="select"
-                    options={names}
-                    value={d.qualityLead}
-                    onChange={(v) => set({ qualityLead: v })}
-                    placeholder="Not assigned"
-                  />
-                </KvRow>
-                <KvRow grey label="Required controls" top={editing}>
-                  <PillSet
-                    editing={editing}
-                    options={REG_CONTROLS}
-                    values={d.regControls}
-                    onChange={(v) => set({ regControls: v })}
-                  />
-                </KvRow>
-              </div>
-            </SubCard>
-          )}
-        </>
-      );
-    },
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+      </Card>
+
+      <div className="flex flex-col gap-3 rounded-[20px] border border-[#EDEDF0] bg-[#E9EEFC] px-4 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-sm leading-[1.5] font-semibold text-blue">
+            <Icon icon={huge(BinocularsIcon)} size={16} stroke={1.6} />
+            Access Preview
+          </p>
+          <div
+            role="tablist"
+            aria-label="Preview access for"
+            className="flex items-center gap-0.5 rounded-lg border border-[#EDEDF0] bg-white p-1"
+          >
+            {(["Sponsor", "Lead", "Member", "External"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                role="tab"
+                aria-selected={role === r}
+                onClick={() => setRole(r)}
+                className={`h-7 rounded-lg px-2.5 py-0.5 text-xs font-medium ${role === r ? "bg-blue text-white" : "text-body hover:text-[#101D37]"}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-lg leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37]">
+          {d.name || "Untitled project"}
+        </p>
+        <p className="max-w-[460px] text-base leading-[1.5] tracking-[-0.02em] text-body">
+          {role === "External" ? external : ACCESS_TEXT[role]}
+        </p>
+      </div>
+
+      <p className="text-base leading-[1.5] tracking-[-0.02em] text-body">
+        Creating this project establishes its charter, departments,
+        participating teams and governance. People are inherited from teams.
+        Research work packages are configured separately
+      </p>
+      <div className="flex flex-col gap-2">
+        <ErrorLine text={c.error} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={c.saveDraft}
+            className="text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-[#101D37] hover:text-blue"
+          >
+            {c.saved ? "Draft Saved ✓" : "Save Draft"}
+          </button>
+          <div className="flex items-center gap-2.5">
+            {c.back && (
+              <button
+                type="button"
+                onClick={c.back}
+                className="flex h-9 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[#101D37] hover:text-blue"
+              >
+                <Icon icon={huge(ArrowLeft01Icon)} size={16} stroke={1.8} />
+                Back
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={c.create}
+              disabled={missing.length > 0}
+              title={
+                missing.length ? "Complete the items above first" : undefined
+              }
+              className={BLUE_BTN}
+            >
+              Create Project
+            </button>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+/* ---------------- step list ---------------- */
+
+export const STEPS: StepDef[] = [
+  {
+    id: "charter",
+    section: "Charter",
+    validate: (d) =>
+      !d.name.trim()
+        ? "Please give the project a name."
+        : !d.objective.trim()
+          ? "Please describe the business objective."
+          : null,
+    render: CharterStep,
   },
   {
-    id: "records",
+    id: "scope",
+    section: "Charter",
+    validate: (d) =>
+      d.start && d.target && d.target < d.start
+        ? "Target completion can't be before the planned start."
+        : null,
+    render: ScopeStep,
+  },
+  {
+    id: "org",
+    section: "Organization",
+    validate: (d) => {
+      if (!d.sponsor || !d.lead)
+        return "Choose an executive sponsor and a project lead.";
+      if (!d.departments.length)
+        return "Select at least one participating department.";
+      if (d.teamMode !== TEAM_MODES[0].value) return null;
+      const miss = d.departments.find(
+        (dep) => !d.teams.some((t) => t.startsWith(dep + " ·")),
+      );
+      return miss
+        ? `${miss} needs at least one team. Use Edit Details to pick one.`
+        : null;
+    },
+    render: OrganizationStep,
+  },
+  {
+    id: "delivery",
+    section: "Delivery",
+    alwaysEdit: true,
+    validate: (d) => {
+      if (
+        !d.workstreams.some((w) => w.name.trim() && w.owner && w.output.trim())
+      )
+        return "Add at least one workstream with a name, owner and expected output.";
+      if (!d.gates.some((g) => g.name.trim() && g.criteria.trim()))
+        return "Add at least one decision gate with acceptance criteria.";
+      const i = d.gates.findIndex((g) => !g.approver || !g.workstreams.length);
+      return i >= 0
+        ? `Decision Gate ${i + 1} needs an approver and at least one workstream in its scope.`
+        : null;
+    },
+    render: DeliveryStep,
+  },
+  {
+    id: "delivery2",
+    section: "Delivery",
+    alwaysEdit: true,
+    validate: (d) =>
+      d.risks.some((r) => r.risk.trim()) || d.noRiskReason.trim()
+        ? null
+        : "Add a risk, or explain why no material risks are identified.",
+    render: Delivery2Step,
+  },
+  {
+    id: "controls",
     section: "Controls",
-    title: "Records And External Access",
-    icon: Database01Icon,
-    summary: (d) =>
-      [
-        d.externalAccess,
-        d.dataLocation && `Location: ${d.dataLocation}`,
-        d.retention && `Retention: ${d.retention}`,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    body: ({ d, set, editing }) => (
-      <>
-        <KvRow label="External access">
-          <Val
-            label="External access"
-            editing={editing}
-            kind="select"
-            options={EXTERNAL_ACCESS.map((x) => x.value)}
-            value={d.externalAccess}
-            onChange={(v) => set({ externalAccess: v })}
-          />
-        </KvRow>
-        <KvRow label="Data location">
-          <Val
-            label="Data location"
-            editing={editing}
-            value={d.dataLocation}
-            onChange={(v) => set({ dataLocation: v })}
-            placeholder="e.g. EU, UK, US (optional)"
-          />
-        </KvRow>
-        <KvRow label="Record retention">
-          <Val
-            label="Record retention"
-            editing={editing}
-            value={d.retention}
-            onChange={(v) => set({ retention: v })}
-            placeholder="e.g. 10 years; subject to policy"
-          />
-        </KvRow>
-      </>
-    ),
+    alwaysEdit: true,
+    render: ControlsStep,
   },
 ];

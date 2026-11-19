@@ -14,7 +14,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Artifex Labs",
-  description: "Political Reputation Management",
+  description: "AI research workspace: projects, evidence, signals and team collaboration for R&D.",
 };
 
 export default function RootLayout({
