@@ -15,7 +15,9 @@ import {
   RecordingBar,
   VoiceChip,
   VoiceError,
-  useVoiceRecorder,
+  useDictation,
+  appendText,
+  TranscribingLine,
   type VoiceNote,
 } from "@/components/voice/Voice";
 import Icon, { huge } from "@/components/dashboard/Icon";
@@ -60,7 +62,7 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<string[]>([]);
   const [notes, setNotes] = useState<VoiceNote[]>([]);
-  const rec = useVoiceRecorder({ onDone: (n) => setNotes((l) => [...l, n]) });
+  const rec = useDictation((t) => setText((p) => appendText(p, t)));
   const [now, setNow] = useState(() => Date.now());
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -239,8 +241,10 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
               e.target.value = "";
             }}
           />
-          {rec.active ? (
-            <RecordingBar rec={rec} className="h-9" />
+          {rec.transcribing ? (
+            <TranscribingLine />
+          ) : rec.active ? (
+            <RecordingBar rec={rec} className="min-h-9" />
           ) : (
             <input
               value={text}
@@ -250,7 +254,9 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
               className="h-9 min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
             />
           )}
-          {!rec.active && <MicButton rec={rec} size={32} />}
+          {!rec.active && !rec.transcribing && (
+            <MicButton rec={rec} size={32} />
+          )}
           <button
             type="submit"
             aria-label="Send"

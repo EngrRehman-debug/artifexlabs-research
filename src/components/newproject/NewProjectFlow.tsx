@@ -17,19 +17,16 @@ import ResearchPickers from "@/components/knowledge/ResearchPickers";
 import {
   MicButton,
   RecordingBar,
+  TranscribingLine,
   VoiceChip,
   VoiceError,
-  useVoiceRecorder,
+  appendText,
+  useDictation,
   type VoiceNote,
 } from "@/components/voice/Voice";
 import { EMPTY_DRAFT, type Draft } from "@/lib/newProject";
 import { addCreated, slugFor } from "@/lib/createdProjects";
-import {
-  aiInsights,
-  aiIntake,
-  aiTranscribe,
-  useResearchContext,
-} from "@/lib/ai/client";
+import { aiInsights, aiIntake, useResearchContext } from "@/lib/ai/client";
 import type { IntakeRequest, ProjectInsights, Question } from "@/lib/ai/types";
 import QuestionForm from "./QuestionForm";
 import {
@@ -414,12 +411,9 @@ export default function NewProjectFlow({
   const [promptNotes, setPromptNotes] = useState<VoiceNote[]>([]);
   const [message, setMessage] = useState("");
   const [chatNotes, setChatNotes] = useState<VoiceNote[]>([]);
-  const promptRec = useVoiceRecorder({
-    onDone: (n) => setPromptNotes((l) => [...l, n]),
-  });
-  const chatRec = useVoiceRecorder({
-    onDone: (n) => setChatNotes((l) => [...l, n]),
-  });
+  /* mic = dictation: what you say is written into the box (English) */
+  const promptRec = useDictation((t) => setPromptText((p) => appendText(p, t)));
+  const chatRec = useDictation((t) => setMessage((p) => appendText(p, t)));
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -564,9 +558,10 @@ export default function NewProjectFlow({
   const push = (key: string, m: Msg) =>
     setThread((t) => ({ ...t, [key]: [...(t[key] ?? []), m] }));
 
-  /** voice notes → text (Groq Whisper); a failed note just gives no text */
-  const transcribeAll = async (notes: VoiceNote[]) =>
-    (await Promise.all(notes.map((n) => aiTranscribe(n.src).catch(() => ""))))
+  /** voice notes → the text the browser recognised while recording */
+  const transcribeAll = (notes: VoiceNote[]) =>
+    notes
+      .map((n) => n.text ?? "")
       .filter(Boolean)
       .join(" ");
 
@@ -689,7 +684,7 @@ export default function NewProjectFlow({
 
     let text = typed;
     if (notes.length) {
-      const transcript = await transcribeAll(notes);
+      const transcript = transcribeAll(notes);
       if (transcript) {
         text = [typed, transcript].filter(Boolean).join("\n\n");
         setThread({ [INTRO]: [{ ...first, transcript }] });
@@ -774,7 +769,7 @@ export default function NewProjectFlow({
     else setStepBusy(true);
     let text = typed;
     if (notes.length) {
-      const transcript = await transcribeAll(notes);
+      const transcript = transcribeAll(notes);
       if (transcript) {
         text = [typed, transcript].filter(Boolean).join("\n\n");
         setThread((t) => ({
@@ -851,7 +846,11 @@ export default function NewProjectFlow({
           className="flex flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-white p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.10)]"
         >
           <div className="flex flex-col gap-5 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-4">
-            {promptRec.active ? (
+            {promptRec.transcribing ? (
+              <div className="flex min-h-[120px] items-center">
+                <TranscribingLine />
+              </div>
+            ) : promptRec.active ? (
               <div className="flex min-h-[120px] items-center">
                 <RecordingBar rec={promptRec} />
               </div>
@@ -955,7 +954,8 @@ export default function NewProjectFlow({
                 aria-label="Start project setup"
                 disabled={
                   (!promptText.trim() && !promptNotes.length) ||
-                  promptRec.active
+                  promptRec.active ||
+                  promptRec.transcribing
                 }
                 className="flex size-9 items-center justify-center rounded-[10px] bg-blue text-white disabled:opacity-40"
               >
@@ -1302,7 +1302,9 @@ export default function NewProjectFlow({
           )}
           <VoiceError rec={chatRec} />
           <label className="flex min-h-[70px] items-center gap-2.5 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-4 focus-within:border-blue">
-            {chatRec.active ? (
+            {chatRec.transcribing ? (
+              <TranscribingLine />
+            ) : chatRec.active ? (
               <RecordingBar rec={chatRec} />
             ) : (
               <>
@@ -1331,7 +1333,10 @@ export default function NewProjectFlow({
               type="submit"
               aria-label="Send"
               disabled={
-                (!message.trim() && !chatNotes.length) || chatRec.active || busy
+                (!message.trim() && !chatNotes.length) ||
+                chatRec.active ||
+                chatRec.transcribing ||
+                busy
               }
               className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue text-white disabled:opacity-60"
             >

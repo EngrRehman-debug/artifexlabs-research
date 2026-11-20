@@ -32,11 +32,6 @@ export const aiIntake = (req: IntakeRequest) =>
 export const aiInsights = (req: InsightsRequest) =>
   postJson<ProjectInsights>("/api/ai/insights", req);
 
-export const aiTranscribe = (audio: string) =>
-  postJson<{ text: string }>("/api/ai/transcribe", { audio }).then(
-    (r) => r.text,
-  );
-
 /** Model panel, reasoning and selected Knowledge Library sources, as the AI routes expect them. */
 export function useResearchContext() {
   const k = useKnowledge();

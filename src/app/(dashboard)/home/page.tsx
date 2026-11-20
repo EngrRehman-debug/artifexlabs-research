@@ -23,7 +23,9 @@ import {
   RecordingBar,
   VoiceChip,
   VoiceError,
-  useVoiceRecorder,
+  useDictation,
+  appendText,
+  TranscribingLine,
   type VoiceNote,
 } from "@/components/voice/Voice";
 
@@ -95,14 +97,16 @@ function ChartCard({ title, subtitle }: { title: string; subtitle: string }) {
 function HomePrompt() {
   const [text, setText] = useState("");
   const [notes, setNotes] = useState<VoiceNote[]>([]);
-  const rec = useVoiceRecorder({ onDone: (n) => setNotes((l) => [...l, n]) });
+  const rec = useDictation((t) => setText((p) => appendText(p, t)));
   return (
     <form
       onSubmit={(e) => e.preventDefault()}
       className="flex flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-white p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.10)]"
     >
       <div className="flex min-h-[58px] items-center gap-2 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] px-4 py-2.5">
-        {rec.active ? (
+        {rec.transcribing ? (
+          <TranscribingLine />
+        ) : rec.active ? (
           <RecordingBar rec={rec} />
         ) : (
           <label className="flex min-w-0 flex-1 items-center gap-2">
