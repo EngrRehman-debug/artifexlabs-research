@@ -17,11 +17,11 @@ import ResearchPickers from "@/components/knowledge/ResearchPickers";
 import {
   MicButton,
   RecordingBar,
-  TranscribingLine,
   VoiceChip,
   VoiceError,
   appendText,
   useDictation,
+  withLive,
   type VoiceNote,
 } from "@/components/voice/Voice";
 import { EMPTY_DRAFT, type Draft } from "@/lib/newProject";
@@ -846,35 +846,29 @@ export default function NewProjectFlow({
           className="flex flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-white p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.10)]"
         >
           <div className="flex flex-col gap-5 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-4">
-            {promptRec.transcribing ? (
-              <div className="flex min-h-[120px] items-center">
-                <TranscribingLine />
-              </div>
-            ) : promptRec.active ? (
-              <div className="flex min-h-[120px] items-center">
-                <RecordingBar rec={promptRec} />
-              </div>
-            ) : (
-              <label className="flex items-start gap-2">
-                <Icon
-                  icon={huge(Add01Icon)}
-                  size={16}
-                  className="mt-1 shrink-0 text-body"
-                />
-                <textarea
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                  rows={5}
-                  placeholder="Describe the project: the question, research objective or decision to make, scope, stakeholders and timeline…"
-                  className="min-h-[120px] w-full resize-none bg-transparent text-base leading-6 tracking-[-0.02em] text-[#101D37] outline-none placeholder:text-body"
-                />
-              </label>
+            <label className="flex items-start gap-2">
+              <Icon
+                icon={huge(Add01Icon)}
+                size={16}
+                className="mt-1 shrink-0 text-body"
+              />
+              <textarea
+                value={withLive(promptText, promptRec)}
+                readOnly={promptRec.active}
+                onChange={(e) => setPromptText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                rows={5}
+                placeholder="Describe the project: the question, research objective or decision to make, scope, stakeholders and timeline…"
+                className="min-h-[120px] w-full resize-none bg-transparent text-base leading-6 tracking-[-0.02em] text-[#101D37] outline-none placeholder:text-body"
+              />
+            </label>
+            {promptRec.active && (
+              <RecordingBar rec={promptRec} caption={false} />
             )}
             <div className="flex flex-wrap items-center gap-[10px] pl-6">
               <button
@@ -1301,34 +1295,46 @@ export default function NewProjectFlow({
             </div>
           )}
           <VoiceError rec={chatRec} />
+          {chatRec.active && (
+            <div className="mb-2.5 px-1">
+              <RecordingBar rec={chatRec} caption={false} />
+            </div>
+          )}
           <label className="flex min-h-[70px] items-center gap-2.5 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-4 focus-within:border-blue">
-            {chatRec.transcribing ? (
-              <TranscribingLine />
-            ) : chatRec.active ? (
-              <RecordingBar rec={chatRec} />
-            ) : (
-              <>
-                <Icon
-                  icon={huge(Add01Icon)}
-                  size={18}
-                  className="shrink-0 text-body"
-                />
-                <input
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  disabled={busy}
-                  placeholder={
-                    busy
-                      ? "Thinking…"
-                      : interviewing
-                        ? "Or answer in your own words…"
-                        : "Ask for a change, e.g. “move the target date to June” or “add a Finance workstream”"
+            <>
+              <Icon
+                icon={huge(Add01Icon)}
+                size={18}
+                className="shrink-0 text-body"
+              />
+              <textarea
+                rows={1}
+                value={withLive(message, chatRec)}
+                readOnly={chatRec.active}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  /* Enter sends, Shift+Enter adds a new line */
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
                   }
-                  className="w-full min-w-0 bg-transparent text-base leading-[1.5] tracking-[-0.02em] text-[#101D37] outline-none placeholder:text-body"
-                />
-                <MicButton rec={chatRec} />
-              </>
-            )}
+                }}
+                disabled={busy}
+                placeholder={
+                  busy
+                    ? "Thinking…"
+                    : interviewing
+                      ? "Or answer in your own words…"
+                      : "Ask for a change, e.g. “move the target date to June” or “add a Finance workstream”"
+                }
+                className="block w-full min-w-0 bg-transparent text-base leading-[1.5] tracking-[-0.02em] text-[#101D37] outline-none placeholder:text-body [field-sizing:content] max-h-[200px] resize-none overflow-y-auto"
+              />
+              {!chatRec.active && <MicButton rec={chatRec} />}
+            </>
             <button
               type="submit"
               aria-label="Send"

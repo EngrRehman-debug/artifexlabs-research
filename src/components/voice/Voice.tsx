@@ -478,21 +478,11 @@ export function useDictation(onText: (text: string) => void) {
 export const appendText = (prev: string, text: string) =>
   prev.trim() ? `${prev.replace(/\s+$/, "")} ${text}` : text;
 
-/** Shown in the message box while the recording is being turned into text. */
-export function TranscribingLine() {
-  return (
-    <span
-      className="flex min-w-0 flex-1 items-center gap-2 text-sm text-body"
-      role="status"
-    >
-      <span
-        aria-hidden
-        className="size-4 shrink-0 animate-spin rounded-full border-2 border-blue/25 border-t-blue"
-      />
-      Turning your voice into text…
-    </span>
-  );
-}
+/** The box's text while dictating: what was already there + the words being spoken now. */
+export const withLive = (
+  text: string,
+  rec: { active: boolean; caption: string },
+) => (rec.active && rec.caption ? appendText(text, rec.caption) : text);
 
 /** Mic button (36px or 32px) */
 export function MicButton({
@@ -527,9 +517,12 @@ export function MicButton({
 export function RecordingBar({
   rec,
   className = "",
+  caption = true,
 }: {
   rec: VoiceRecorder;
   className?: string;
+  /** show the live words under the bar (off when they are typed into the textbox) */
+  caption?: boolean;
 }) {
   return (
     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 ${className}`}>
@@ -587,7 +580,7 @@ export function RecordingBar({
           <Icon icon={huge(Tick02Icon)} size={16} stroke={2} />
         </button>
       </div>
-      {canDictate() && (
+      {caption && canDictate() && (
         <p
           aria-live="polite"
           className={`line-clamp-2 text-sm leading-[1.5] ${rec.caption ? "text-[#101D37]" : "text-body italic"}`}

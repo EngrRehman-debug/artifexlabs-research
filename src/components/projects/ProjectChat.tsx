@@ -16,8 +16,8 @@ import {
   VoiceChip,
   VoiceError,
   useDictation,
+  withLive,
   appendText,
-  TranscribingLine,
   type VoiceNote,
 } from "@/components/voice/Voice";
 import Icon, { huge } from "@/components/dashboard/Icon";
@@ -218,6 +218,11 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
             ))}
           </div>
         )}
+        {rec.active && (
+          <div className="px-1">
+            <RecordingBar rec={rec} caption={false} />
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -241,19 +246,26 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
               e.target.value = "";
             }}
           />
-          {rec.transcribing ? (
-            <TranscribingLine />
-          ) : rec.active ? (
-            <RecordingBar rec={rec} className="min-h-9" />
-          ) : (
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Write Here"
-              aria-label="Message"
-              className="h-9 min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
-            />
-          )}
+          <textarea
+            rows={1}
+            value={withLive(text, rec)}
+            readOnly={rec.active}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              /* Enter sends, Shift+Enter adds a new line */
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            placeholder="Write Here"
+            aria-label="Message"
+            className="block min-h-9 min-w-0 flex-1 bg-transparent py-2 text-sm leading-5 text-[#101D37] outline-none placeholder:text-body [field-sizing:content] max-h-[200px] resize-none overflow-y-auto"
+          />
           {!rec.active && !rec.transcribing && (
             <MicButton rec={rec} size={32} />
           )}

@@ -288,7 +288,10 @@ export function KvRow({
   top,
   wide,
   invalid,
+  stack,
 }: {
+  /** label above a full-width value box (pickers that need room) */
+  stack?: boolean;
   label: ReactNode;
   ai?: boolean;
   children: ReactNode;
@@ -301,16 +304,16 @@ export function KvRow({
 }) {
   return (
     <div
-      className={`grid gap-x-2.5 gap-y-1.5 ${wide ? "sm:grid-cols-[minmax(0,222px)_minmax(0,1fr)]" : "sm:grid-cols-[184px_minmax(0,1fr)]"} ${top ? "items-start" : "items-center"}`}
+      className={`grid gap-x-2.5 gap-y-1.5 ${stack ? "gap-y-2.5" : wide ? "sm:grid-cols-[minmax(0,222px)_minmax(0,1fr)]" : "sm:grid-cols-[184px_minmax(0,1fr)]"} ${top || stack ? "items-start" : "items-center"}`}
     >
-      <span className={`${LABEL} ${top ? "sm:pt-[17px]" : ""}`}>
+      <span className={`${LABEL} ${top && !stack ? "sm:pt-[17px]" : ""}`}>
         {label}
         {invalid && <span className="ml-0.5 text-[#F04438]">*</span>}
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         <div
           data-invalid={invalid || undefined}
-          className={`flex min-h-[62px] items-center gap-2 rounded-[14px] border px-4 py-3 transition-colors ${
+          className={`flex min-h-[62px] gap-2 rounded-[14px] border px-4 py-3 transition-colors ${stack ? "items-start" : "items-center"} ${
             invalid
               ? "border-[#F04438] bg-[#FEF3F2] focus-within:border-[#F04438]"
               : "border-[#EDEDF0] bg-white focus-within:border-blue"
@@ -527,51 +530,231 @@ export function Val({
   );
 }
 
-/** Multi-select as pills; viewing shows only the selected ones. */
-function PillSet({
+/**
+ * Multi-select as removable chips + "Add" menu with search and checkboxes
+ * (departments, steering group). Viewing shows the chosen ones only.
+ */
+function MultiPick({
   editing,
   options,
   values,
   onChange,
+  noun,
   empty = "None selected",
-  show = (v: string) => v,
 }: {
   editing: boolean;
   options: readonly string[];
   values: string[];
   onChange: (next: string[]) => void;
+  /** "department", "person" – used in the button and search texts */
+  noun: string;
   empty?: string;
-  show?: (v: string) => string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [up, setUp] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", down);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", down);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
   if (!editing)
     return values.length ? (
-      <span className="block break-words">{values.map(show).join(", ")}</span>
+      <span className="flex flex-wrap gap-1.5 py-0.5">
+        {values.map((v) => (
+          <span
+            key={v}
+            className="rounded-lg bg-[#F2F4F7] px-2.5 py-1 text-sm font-medium text-[#101D37]"
+          >
+            {v}
+          </span>
+        ))}
+      </span>
     ) : (
       <span className="text-body">{empty}</span>
     );
+
+  const toggle = (o: string) =>
+    onChange(
+      values.includes(o) ? values.filter((x) => x !== o) : [...values, o],
+    );
+  const query = q.trim().toLowerCase();
+  const shown = query
+    ? options.filter((o) => o.toLowerCase().includes(query))
+    : options;
+
   return (
-    <span className="flex flex-wrap gap-1.5 py-0.5">
-      {options.map((o) => {
-        const on = values.includes(o);
-        return (
+    <div
+      ref={ref}
+      className="relative flex flex-wrap items-center gap-1.5 py-0.5"
+    >
+      {values.map((v) => (
+        <span
+          key={v}
+          className="flex items-center gap-1 rounded-lg border border-blue/25 bg-blue/[0.07] py-1 pr-1 pl-2.5 text-sm font-medium whitespace-nowrap text-blue"
+        >
+          {v}
           <button
-            key={o}
             type="button"
-            aria-pressed={on}
-            onClick={() =>
-              onChange(on ? values.filter((x) => x !== o) : [...values, o])
-            }
-            className={`rounded-lg border px-2.5 py-1 text-sm font-medium transition-colors ${
-              on
-                ? "border-blue bg-blue/[0.08] text-blue"
-                : "border-[#EDEDF0] bg-white text-body hover:text-[#101D37]"
-            }`}
+            aria-label={`Remove ${v}`}
+            onClick={() => toggle(v)}
+            className="flex size-5 items-center justify-center rounded-md text-blue/70 hover:bg-blue/10 hover:text-blue"
           >
-            {show(o)}
+            <Icon icon={huge(Cancel01Icon)} size={12} stroke={2} />
           </button>
-        );
-      })}
-    </span>
+        </span>
+      ))}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => {
+          const r = ref.current?.getBoundingClientRect();
+          if (r) setUp(window.innerHeight - r.bottom < 340 && r.top > 340);
+          setQ("");
+          setOpen((o) => !o);
+        }}
+        className="flex items-center gap-1 rounded-lg border border-dashed border-[#D0D5DD] px-2.5 py-1 text-sm font-medium whitespace-nowrap text-body hover:border-blue hover:text-blue"
+      >
+        <Icon icon={huge(Add01Icon)} size={14} stroke={2} />
+        Add {noun}
+      </button>
+      {open && (
+        <div
+          className={`absolute left-0 z-30 flex w-[320px] max-w-[calc(100vw-48px)] flex-col overflow-hidden rounded-[14px] border border-[#EDEDF0] bg-white shadow-[0_14px_30px_0_rgba(16,29,55,0.14)] ${up ? "bottom-full mb-2" : "top-full mt-2"}`}
+        >
+          <div className="border-b border-[#EDEDF0] p-2">
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Search ${noun}s`}
+              aria-label={`Search ${noun}s`}
+              className="h-9 w-full rounded-[10px] border border-[#EDEDF0] bg-[#FAFAFA] px-3 text-sm text-[#101D37] outline-none placeholder:text-body focus:border-blue focus:bg-white"
+            />
+          </div>
+          <ul className="max-h-64 overflow-y-auto p-1.5">
+            {shown.length === 0 && (
+              <li className="px-3 py-2 text-sm text-body">No match</li>
+            )}
+            {shown.map((o) => {
+              const on = values.includes(o);
+              return (
+                <li key={o}>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    onClick={() => toggle(o)}
+                    className="flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-sm text-[#101D37] hover:bg-[#F2F4F7]"
+                  >
+                    <span
+                      aria-hidden
+                      className={`flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? "border-blue bg-blue text-white" : "border-[#667085] bg-white"}`}
+                    >
+                      {on && (
+                        <Icon icon={huge(Tick02Icon)} size={12} stroke={2.6} />
+                      )}
+                    </span>
+                    <span className={on ? "font-semibold" : ""}>{o}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex items-center justify-between border-t border-[#EDEDF0] px-3 py-2">
+            <span className="text-xs text-body">{values.length} selected</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="h-8 rounded-[10px] bg-blue px-3 text-xs font-semibold text-white"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Teams of each department as selectable cards: name, code · people, department lead. */
+function TeamCards({
+  departments,
+  values,
+  onChange,
+}: {
+  departments: string[];
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  if (!departments.length)
+    return <span className="text-body">Choose a department first</span>;
+  return (
+    <div className="flex flex-col gap-3 py-0.5">
+      {departments.map((dep) => (
+        <div key={dep} className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold tracking-[0.02em] text-body">
+            {dep}
+          </span>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-2">
+            {teamsFor(dep).map((id) => {
+              const t = teamInfo(id);
+              const on = values.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() =>
+                    onChange(
+                      on ? values.filter((x) => x !== id) : [...values, id],
+                    )
+                  }
+                  className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 text-left transition-colors ${
+                    on
+                      ? "border-blue bg-blue/[0.05] ring-2 ring-blue/10"
+                      : "border-[#EDEDF0] bg-white hover:border-[#D0D5DD]"
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border ${on ? "border-blue bg-blue text-white" : "border-[#667085] bg-white"}`}
+                  >
+                    {on && (
+                      <Icon icon={huge(Tick02Icon)} size={12} stroke={2.6} />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span
+                      className={`block text-sm leading-[1.4] font-semibold ${on ? "text-blue" : "text-[#101D37]"}`}
+                    >
+                      {t?.name ?? id.split(" · ")[1]}
+                    </span>
+                    {t && (
+                      <span className="block text-xs leading-[1.5] text-body">
+                        {t.code} · {t.people}{" "}
+                        {t.people === 1 ? "person" : "people"} · Lead: {t.lead}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -1093,14 +1276,10 @@ function OrganizationStep(c: StepCtx) {
               onChange={(v) => set({ lead: v })}
             />
           </div>
-          <KvRow
-            wide
-            label="Participating Departments"
-            ai={ai("departments")}
-            top={editing}
-          >
-            <PillSet
+          <KvRow stack label="Participating Departments" ai={ai("departments")}>
+            <MultiPick
               editing={editing}
+              noun="department"
               options={DEPARTMENTS}
               values={d.departments}
               onChange={(v) =>
@@ -1140,38 +1319,13 @@ function OrganizationStep(c: StepCtx) {
             />
           </KvRow>
           {assignNow && (
-            <KvRow
-              wide
-              label="Participating Teams"
-              ai={ai("teams")}
-              top={editing || d.teams.length > 1}
-            >
+            <KvRow stack label="Participating Teams" ai={ai("teams")}>
               {editing ? (
-                <span className="flex flex-col gap-2 py-0.5">
-                  {d.departments.map((dep) => (
-                    <span key={dep} className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-body">
-                        {dep}
-                      </span>
-                      <PillSet
-                        editing
-                        options={teamsFor(dep)}
-                        values={d.teams.filter((t) => t.startsWith(dep + " ·"))}
-                        show={(v) => v.split(" · ")[1]}
-                        onChange={(v) =>
-                          set((p) => ({
-                            teams: [
-                              ...p.teams.filter(
-                                (t) => !t.startsWith(dep + " ·"),
-                              ),
-                              ...v,
-                            ],
-                          }))
-                        }
-                      />
-                    </span>
-                  ))}
-                </span>
+                <TeamCards
+                  departments={d.departments}
+                  values={d.teams}
+                  onChange={(v) => set({ teams: v })}
+                />
               ) : d.teams.length ? (
                 <span className="flex flex-col gap-2">
                   {d.teams.map((t) => (
@@ -1188,8 +1342,9 @@ function OrganizationStep(c: StepCtx) {
             desc="People who receive governance updates and participate in programme decisions."
           >
             {editing ? (
-              <PillSet
+              <MultiPick
                 editing
+                noun="person"
                 options={names}
                 values={d.steering}
                 onChange={(v) => set({ steering: v })}

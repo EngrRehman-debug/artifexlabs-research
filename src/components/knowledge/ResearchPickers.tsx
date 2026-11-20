@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Database01 } from "@untitledui/icons";
+import { Database01, SearchMd, XClose } from "@untitledui/icons";
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
@@ -57,50 +57,65 @@ function Dropdown({
   children,
   up,
   width = 360,
+  plain,
+  ariaLabel,
 }: {
   label: ReactNode;
-  icon: ReactNode;
+  icon?: ReactNode;
   children: (close: () => void) => ReactNode;
   up?: boolean;
   width?: number;
+  /** text-only trigger, no border (like Claude's effort selector) */
+  plain?: boolean;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  /* Keep the panel inside the window: shift it left when it would overflow on the right,
-   * open it on the side with more room, and cap its height there (it scrolls inside),
-   * so it never stretches the page. */
+  /* The panel floats over the page (position: fixed), so it can never make the page taller.
+   * It opens on the side with more room, stays inside the window, scrolls inside when long,
+   * and follows the button when the page scrolls or resizes. */
   const [place, setPlace] = useState<{
-    shift: number;
-    up: boolean;
-    maxH?: number;
-  }>({ shift: 0, up: !!up });
+    top?: number;
+    bottom?: number;
+    left: number;
+    maxH: number;
+  } | null>(null);
   useLayoutEffect(() => {
-    if (!open || !panel.current || !ref.current) return;
-    const place = () => {
+    if (!open) {
+      setPlace(null);
+      return;
+    }
+    const measure = () => {
       if (!panel.current || !ref.current) return;
       const btn = ref.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
       const natural = panel.current.scrollHeight;
-      const GAP = 8 + 16;
-      const below = window.innerHeight - btn.bottom - GAP;
-      /* keep clear of the sticky top bar (about 70px) */
-      const above = btn.top - GAP - 64;
+      const GAP = 8;
+      const EDGE = 12;
+      const below = vh - btn.bottom - GAP - EDGE;
+      /* keep clear of the sticky top bar (64px) */
+      const above = btn.top - GAP - Math.max(EDGE, 72);
       const goUp = up
         ? natural <= above || above >= below
         : natural > below && above > below;
-      const room = goUp ? above : below;
-      const left = btn.left;
-      const over = left + panel.current.offsetWidth - (window.innerWidth - 16);
-      setPlace({
-        shift: over > 0 ? Math.min(over, left - 16) : 0,
-        up: goUp,
-        maxH: natural > room ? Math.max(160, room) : undefined,
-      });
+      const w = Math.min(width, vw - 2 * EDGE);
+      const left = Math.max(EDGE, Math.min(btn.left, vw - w - EDGE));
+      setPlace(
+        goUp
+          ? { bottom: vh - btn.top + GAP, left, maxH: Math.max(160, above) }
+          : { top: btn.bottom + GAP, left, maxH: Math.max(160, below) },
+      );
     };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [open, up]);
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open, up, width]);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -119,11 +134,16 @@ function Dropdown({
       <button
         type="button"
         aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-9 items-center gap-1.5 rounded-[10px] border px-2.5 text-sm leading-[1.5] tracking-[-0.02em] transition-colors ${
-          open
-            ? "border-blue bg-blue/[0.04] text-[#101D37]"
-            : "border-[#EDEDF0] bg-white text-body hover:border-[#D0D5DD] hover:text-[#101D37]"
+        className={`flex h-9 items-center gap-1.5 rounded-[10px] px-2.5 text-sm leading-[1.5] tracking-[-0.02em] transition-colors ${
+          plain
+            ? open
+              ? "bg-[#F2F4F7] text-[#101D37]"
+              : "text-body hover:bg-[#F2F4F7] hover:text-[#101D37]"
+            : open
+              ? "border border-blue bg-blue/[0.04] text-[#101D37]"
+              : "border border-[#EDEDF0] bg-white text-body hover:border-[#D0D5DD] hover:text-[#101D37]"
         }`}
       >
         {icon}
@@ -138,13 +158,14 @@ function Dropdown({
         <div
           ref={panel}
           role="dialog"
-          className={`absolute left-0 z-40 flex max-w-[calc(100vw-32px)] flex-col overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-[#EDEDF0] bg-white shadow-[0_14px_30px_0_rgba(16,29,55,0.14)] ${place.up ? "bottom-11" : "top-11"}`}
+          className="fixed z-50 flex flex-col overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl [&>*]:shrink-0 border border-[#EDEDF0] bg-white shadow-[0_14px_30px_0_rgba(16,29,55,0.14)]"
           style={{
-            width,
-            maxHeight: place.maxH,
-            transform: place.shift
-              ? `translateX(-${place.shift}px)`
-              : undefined,
+            width: `min(${width}px, calc(100vw - 24px))`,
+            top: place?.top,
+            bottom: place?.bottom,
+            left: place?.left ?? -9999,
+            maxHeight: place?.maxH,
+            visibility: place ? "visible" : "hidden",
           }}
         >
           {children(() => setOpen(false))}
@@ -159,6 +180,85 @@ function SectionHead({ children }: { children: ReactNode }) {
     <p className="px-4 pt-3 pb-1.5 text-[11px] font-semibold tracking-[0.06em] text-body uppercase">
       {children}
     </p>
+  );
+}
+
+/** Knowledge Library sources with a search box (like Claude's project picker). */
+function RepoList() {
+  const k = useKnowledge();
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const shown = query
+    ? k.repos.filter(
+        (r) =>
+          r.name.toLowerCase().includes(query) ||
+          r.kind.toLowerCase().includes(query),
+      )
+    : k.repos;
+  return (
+    <>
+      <div className="px-3 pb-2">
+        <label className="flex h-9 items-center gap-2 rounded-[10px] border border-[#EDEDF0] bg-[#FAFAFA] px-2.5 focus-within:border-blue focus-within:bg-white">
+          <Icon
+            icon={untitled(SearchMd)}
+            size={15}
+            className="shrink-0 text-body"
+          />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && q) {
+                e.stopPropagation();
+                setQ("");
+              }
+            }}
+            placeholder="Search sources"
+            aria-label="Search Knowledge Library sources"
+            className="h-full min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
+          />
+          {q && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQ("")}
+              className="shrink-0 text-body hover:text-[#101D37]"
+            >
+              <Icon icon={untitled(XClose)} size={14} />
+            </button>
+          )}
+        </label>
+      </div>
+      <ul className="flex flex-col px-2 pb-2">
+        {shown.length === 0 && (
+          <li className="px-2 py-3 text-sm text-body">
+            No sources match “{q.trim()}”.
+          </li>
+        )}
+        {shown.map((r) => (
+          <li key={r.id}>
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[#F8F9FC]">
+              <input
+                type="checkbox"
+                checked={r.active}
+                onChange={(e) =>
+                  updateKnowledge((s) => ({
+                    repos: s.repos.map((x) =>
+                      x.id === r.id ? { ...x, active: e.target.checked } : x,
+                    ),
+                  }))
+                }
+                className="size-4 shrink-0 cursor-pointer accent-blue"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-[#101D37]">
+                {r.name}
+              </span>
+              <span className="shrink-0 text-xs text-body">{r.records}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -226,34 +326,7 @@ export function SourcesPicker({ up }: { up?: boolean }) {
             ))}
           </div>
           <SectionHead>Knowledge Library</SectionHead>
-          <ul className="flex max-h-[220px] flex-col overflow-y-auto px-2 pb-2">
-            {k.repos.map((r) => (
-              <li key={r.id}>
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[#F8F9FC]">
-                  <input
-                    type="checkbox"
-                    checked={r.active}
-                    onChange={(e) =>
-                      updateKnowledge((s) => ({
-                        repos: s.repos.map((x) =>
-                          x.id === r.id
-                            ? { ...x, active: e.target.checked }
-                            : x,
-                        ),
-                      }))
-                    }
-                    className="size-4 shrink-0 cursor-pointer accent-blue"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm text-[#101D37]">
-                    {r.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-body">
-                    {r.records}
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          <RepoList />
           <Link
             href="/knowledge"
             className="flex items-center justify-between border-t border-[#EDEDF0] px-4 py-3 text-sm font-semibold text-blue hover:bg-blue/[0.04]"
@@ -354,28 +427,7 @@ export function ModelsPicker({ up }: { up?: boolean }) {
               );
             })}
           </div>
-          <SectionHead>Reasoning</SectionHead>
-          <div className="grid grid-cols-3 gap-1 px-3 pb-3">
-            {REASONING.map((r) => {
-              const on = r.id === k.reasoning;
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  title={r.desc}
-                  aria-pressed={on}
-                  onClick={() => updateKnowledge(() => ({ reasoning: r.id }))}
-                  className={`h-8 rounded-[10px] text-xs font-semibold transition-colors ${on ? "bg-blue text-white" : "bg-[#F2F4F7] text-body hover:text-[#101D37]"}`}
-                >
-                  {r.name}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex items-center justify-between border-t border-[#EDEDF0] px-4 py-2.5">
-            <span className="text-xs text-body">
-              Gemini and Groq are connected. Claude and Perplexity are coming.
-            </span>
+          <div className="flex items-center justify-end border-t border-[#EDEDF0] px-4 py-2.5">
             <button
               type="button"
               onClick={close}
@@ -390,12 +442,74 @@ export function ModelsPicker({ up }: { up?: boolean }) {
   );
 }
 
+/** Reasoning effort, shown next to the model button (like Claude's "Medium"). */
+export function ReasoningPicker({ up }: { up?: boolean }) {
+  const k = useKnowledge();
+  const cur = REASONING.find((r) => r.id === k.reasoning) ?? REASONING[0];
+  return (
+    <Dropdown
+      up={up}
+      plain
+      width={280}
+      ariaLabel={`Reasoning: ${cur.name}`}
+      label={cur.name}
+    >
+      {(close) => (
+        <div
+          role="radiogroup"
+          aria-label="Reasoning"
+          className="flex flex-col gap-0.5 p-1.5"
+        >
+          {REASONING.map((r) => {
+            const on = r.id === cur.id;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => {
+                  updateKnowledge(() => ({ reasoning: r.id }));
+                  close();
+                }}
+                className={`flex items-start justify-between gap-3 rounded-[10px] px-3 py-2.5 text-left transition-colors ${
+                  on ? "bg-blue/[0.06]" : "hover:bg-[#F8F9FC]"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span
+                    className={`block text-sm font-semibold ${on ? "text-blue" : "text-[#101D37]"}`}
+                  >
+                    {r.name}
+                  </span>
+                  <span className="block text-xs text-body">{r.desc}</span>
+                </span>
+                {on && (
+                  <Icon
+                    icon={huge(Tick02Icon)}
+                    size={16}
+                    stroke={2}
+                    className="mt-0.5 shrink-0 text-blue"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Dropdown>
+  );
+}
+
 /** Sources + Models side by side (prompt toolbars) */
 export default function ResearchPickers({ up }: { up?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <SourcesPicker up={up} />
-      <ModelsPicker up={up} />
+      <div className="flex items-center gap-0.5">
+        <ModelsPicker up={up} />
+        <ReasoningPicker up={up} />
+      </div>
     </div>
   );
 }

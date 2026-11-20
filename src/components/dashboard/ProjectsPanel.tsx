@@ -27,9 +27,7 @@ const WP_SECTIONS = [
   { key: "overview", label: "Overview" },
   { key: "workspace", label: "Workspace" },
   { key: "evidence", label: "Evidence" },
-  { key: "findings", label: "Findings" },
-  { key: "reviews", label: "Reviews & Decisions" },
-  { key: "reports", label: "Reports" },
+  /* Findings, Reviews & Decisions and Reports are hidden until those screens exist */
 ] as const;
 
 /** project-level screens (Departments, Baseline, Teams, Chats) */
