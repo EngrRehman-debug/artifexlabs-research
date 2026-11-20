@@ -14,11 +14,8 @@ import {
 } from "@untitledui/icons";
 import {
   Calendar03Icon,
-  LeftToRightListBulletIcon,
   Mortarboard02Icon,
   Notification01Icon,
-  Search01Icon,
-  SearchList01Icon,
   UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge, untitled, type AnyIcon } from "./Icon";
@@ -28,11 +25,8 @@ type Item = { label: string; href: string; icon: AnyIcon; chevron?: boolean };
 const MAIN_MENU: Item[] = [
   { label: "Home", href: "/home", icon: untitled(HomeLine) },
   { label: "Projects", href: "/projects", icon: untitled(Folder), chevron: true },
-  { label: "Research", href: "#", icon: huge(SearchList01Icon) },
-  { label: "Findings", href: "#", icon: huge(Search01Icon) },
   { label: "Signals & Monitoring", href: "#", icon: untitled(Signal01) },
-  { label: "My Work", href: "#", icon: huge(LeftToRightListBulletIcon) },
-  { label: "Knowledge Library", href: "#", icon: huge(Mortarboard02Icon) },
+  { label: "Knowledge Library", href: "/knowledge", icon: huge(Mortarboard02Icon) },
   { label: "Calendar", href: "/calendar", icon: huge(Calendar03Icon) },
 ];
 

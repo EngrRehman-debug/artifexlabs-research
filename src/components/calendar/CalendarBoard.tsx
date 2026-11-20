@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
@@ -9,12 +10,29 @@ import {
   FilterLines,
   SearchMd,
 } from "@untitledui/icons";
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  Cancel01Icon,
+  ChartLineData01Icon,
+  Clock01Icon,
+  Copy01Icon,
+  Delete02Icon,
+  Link01Icon,
+  Location01Icon,
+  Notification01Icon,
+  TextAlignLeftIcon,
+  Tick02Icon,
+  UserGroupIcon,
+  Video01Icon,
+} from "@hugeicons/core-free-icons";
+import { TEAM_MEMBERS } from "@/lib/projectScreens";
 import AvatarStack from "@/components/dashboard/AvatarStack";
 import Icon, { huge, untitled } from "@/components/dashboard/Icon";
-import { StageBar } from "@/components/dashboard/ProjectUi";
+import { ProgressSlider, StageBar } from "@/components/dashboard/ProjectUi";
 import {
   INITIAL_EVENTS,
+  REMINDERS,
+  REPEATS,
   STATUSES,
   STATUS_STYLE,
   formatRange,
@@ -98,7 +116,14 @@ function KanbanIcon() {
 /* Figma "black-left" / "black-right": 16 frame, arrow 13.33 x 7.11 at (1.33, 4.45) */
 function PageArrow({ dir }: { dir: -1 | 1 }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden style={dir === 1 ? { transform: "scaleX(-1)" } : undefined}>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      style={dir === 1 ? { transform: "scaleX(-1)" } : undefined}
+    >
       <path
         d="M14.67 8H1.83M1.83 8l3.4-3.05M1.83 8l3.4 3.05"
         stroke="currentColor"
@@ -183,6 +208,7 @@ function KanbanCard({
           </h3>
           <p className="text-xs leading-[1.5] font-medium tracking-[-0.02em] text-body">
             {formatRange(ev.start, ev.end)}
+            {!ev.allDay && ev.startTime ? ` · ${ev.startTime}` : ""}
           </p>
         </div>
         <button
@@ -365,6 +391,7 @@ function EventCard({
               </span>
               <span className="text-xs leading-[1.5] font-medium tracking-[-0.02em] text-body">
                 {formatRange(ev.start, ev.end)}
+                {!ev.allDay && ev.startTime ? ` · ${ev.startTime}` : ""}
               </span>
             </span>
           </span>
@@ -409,6 +436,7 @@ function EventCard({
       </span>
       <span className="text-[10px] leading-[1.5] font-medium tracking-[-0.02em] text-body">
         {formatRange(ev.start, ev.end)}
+        {!ev.allDay && ev.startTime ? ` · ${ev.startTime}` : ""}
       </span>
       <span className="flex items-center gap-[7.83px]">
         <People more={ev.more} size={16} />
@@ -542,10 +570,20 @@ function MonthView({
       {/* Figma "Pagination": hug 68 x 30, gap 8. Each "item": 30 x 30, radius 4, white, border #EDEDF0,
        * Shadow/01; icon "black-left/right" 16 frame with a 13.33 x 7.11 arrow in #667085 (Body Fonts). */}
       <div className="flex items-center justify-center gap-2">
-        {([
-          { dir: -1, onClick: onPrev, label: `Previous month (${monthLabel(month === 0 ? year - 1 : year, (month + 11) % 12)})` },
-          { dir: 1, onClick: onNext, label: `Next month (${monthLabel(month === 11 ? year + 1 : year, (month + 1) % 12)})` },
-        ] as const).map(({ dir, onClick, label }) => (
+        {(
+          [
+            {
+              dir: -1,
+              onClick: onPrev,
+              label: `Previous month (${monthLabel(month === 0 ? year - 1 : year, (month + 11) % 12)})`,
+            },
+            {
+              dir: 1,
+              onClick: onNext,
+              label: `Next month (${monthLabel(month === 11 ? year + 1 : year, (month + 1) % 12)})`,
+            },
+          ] as const
+        ).map(({ dir, onClick, label }) => (
           <button
             key={dir}
             type="button"
@@ -565,9 +603,71 @@ function MonthView({
   );
 }
 
-/* ---------------- Add / edit event dialog ---------------- */
+/* ---------------- Add / edit event dialog (Google Calendar style) ---------------- */
 
 type Draft = Omit<CalEvent, "id">;
+
+const PEOPLE = TEAM_MEMBERS;
+const personOf = (g: string) =>
+  PEOPLE.find((p) => p.name === g || p.email === g);
+const initials = (s: string) =>
+  s
+    .replace(/@.*/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
+function GuestAvatar({ g, size = 28 }: { g: string; size?: number }) {
+  const p = personOf(g);
+  if (p?.avatar)
+    return (
+      <Image
+        src={p.avatar}
+        alt=""
+        width={size * 2}
+        height={size * 2}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-blue/10 text-[11px] font-semibold text-blue"
+      style={{ width: size, height: size }}
+    >
+      {initials(p?.name ?? g)}
+    </span>
+  );
+}
+
+/** One detail row: 20px icon column + content (Google Calendar layout) */
+function Row({
+  icon,
+  children,
+  label,
+}: {
+  icon: Parameters<typeof huge>[0];
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="grid grid-cols-[20px_minmax(0,1fr)] items-start gap-x-3">
+      <span className="mt-[10px] text-body" aria-hidden title={label}>
+        <Icon icon={huge(icon)} size={18} stroke={1.5} />
+      </span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+const FIELD_BASE =
+  "h-10 min-w-0 rounded-[10px] border border-[#EDEDF0] bg-white px-3 text-sm text-[#101D37] outline-none placeholder:text-body hover:border-[#D0D5DD] focus:border-blue";
+const FIELD = `${FIELD_BASE} w-full`;
+const SELECT = `${FIELD_BASE} cursor-pointer appearance-none bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-8`;
+const CHEVRON =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")";
 
 function EventDialog({
   initial,
@@ -585,10 +685,24 @@ function EventDialog({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [start, setStart] = useState(initial?.start ?? defaultDate);
   const [end, setEnd] = useState(initial?.end ?? defaultDate);
+  const [allDay, setAllDay] = useState(initial?.allDay ?? !initial?.startTime);
+  const [startTime, setStartTime] = useState(initial?.startTime ?? "10:00");
+  const [endTime, setEndTime] = useState(initial?.endTime ?? "11:00");
+  const [repeat, setRepeat] = useState(initial?.repeat ?? REPEATS[0]);
+  const [guests, setGuests] = useState<string[]>(initial?.guests ?? []);
+  const [guestText, setGuestText] = useState("");
+  const [meetLink, setMeetLink] = useState(initial?.meetLink ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [agenda, setAgenda] = useState(initial?.agenda ?? "");
+  const [reminder, setReminder] = useState(initial?.reminder ?? REMINDERS[2]);
   const [status, setStatus] = useState<EventStatus>(
     initial?.status ?? "Scheduled",
   );
+  const [progress, setProgress] = useState(initial?.progress ?? 0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const downOnBackdrop = useRef(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -598,141 +712,436 @@ function EventDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const input =
-    "h-10 rounded-[10px] border border-[#EDEDF0] bg-white px-3 text-sm font-normal text-[#101D37] outline-none placeholder:text-body focus:border-blue";
+  const q = guestText.trim().toLowerCase();
+  const suggestions = q
+    ? PEOPLE.filter(
+        (p) =>
+          !guests.includes(p.name) &&
+          (p.name.toLowerCase().includes(q) || p.email.includes(q)),
+      ).slice(0, 5)
+    : [];
+
+  const addGuest = (g: string) => {
+    const v = g.trim();
+    if (!v) return;
+    const isEmail = /^\S+@\S+\.\S+$/.test(v);
+    const match = PEOPLE.find(
+      (p) =>
+        p.name.toLowerCase() === v.toLowerCase() || p.email === v.toLowerCase(),
+    );
+    if (!match && !isEmail) {
+      setError("Pick someone from the list or enter a full email address.");
+      return;
+    }
+    const id = match?.name ?? v.toLowerCase();
+    if (!guests.includes(id)) setGuests((l) => [...l, id]);
+    setGuestText("");
+    setError(null);
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return setError("Add a title for the event.");
+    if (end < start)
+      return setError("The end date can't be before the start date.");
+    if (!allDay && start === end && endTime <= startTime)
+      return setError("The end time must be after the start time.");
+    onSave({
+      title: title.trim(),
+      start,
+      end,
+      status,
+      progress,
+      more: Math.max(guests.length - 2, initial?.more ?? 0),
+      allDay,
+      startTime: allDay ? undefined : startTime,
+      endTime: allDay ? undefined : endTime,
+      repeat,
+      guests,
+      meetLink: meetLink.trim() || undefined,
+      location: location.trim() || undefined,
+      agenda: agenda.trim() || undefined,
+      reminder,
+    });
+  };
+
+  const bar = STATUS_STYLE[status].bar;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#101D37]/40 p-4"
-      onClick={onClose}
+      /* close only when the click starts and ends on the backdrop (not after a drag) */
+      onMouseDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        if (downOnBackdrop.current && e.target === e.currentTarget) onClose();
+      }}
     >
       <form
         onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!title.trim()) return;
-          onSave({
-            title: title.trim(),
-            start,
-            end: end < start ? start : end,
-            status,
-            progress: initial?.progress ?? 0,
-            more: initial?.more ?? 0,
-          });
-        }}
+        onSubmit={submit}
+        noValidate
         role="dialog"
         aria-modal="true"
         aria-label={initial ? "Edit event" : "Add event"}
-        className="flex w-full max-w-[400px] flex-col gap-4 rounded-[20px] border border-[#EDEDF0] bg-white p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.10)]"
+        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[560px] flex-col overflow-hidden rounded-[20px] border border-[#EDEDF0] bg-white shadow-[0_14px_30px_0_rgba(40,92,224,0.10)]"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-xl leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37]">
-              {initial ? "Edit Event" : "Add Event"}
-            </h2>
-            {initial && (
-              <p className="text-xs font-medium text-body">
-                {formatRange(initial.start, initial.end)}
-              </p>
-            )}
-          </div>
-          {initial && <StatusPill status={initial.status} badge />}
+        {/* header */}
+        <div className="flex items-center justify-between gap-3 border-b border-[#EDEDF0] px-5 py-3">
+          <span className="text-sm font-semibold text-body">
+            {initial ? "Edit Event" : "New Event"}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-8 items-center justify-center rounded-[10px] text-body hover:bg-[#F2F4F7] hover:text-[#101D37]"
+          >
+            <Icon icon={huge(Cancel01Icon)} size={18} stroke={1.6} />
+          </button>
         </div>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-[#101D37]">
-          Title
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Partner evidence discussion"
-            className={input}
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#101D37]">
-            Start
-            <input
-              type="date"
-              required
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className={input}
+
+        <div className="flex flex-col gap-4 overflow-y-auto px-5 py-4">
+          {/* title */}
+          <div className="flex items-stretch gap-3">
+            <span
+              className="w-1 shrink-0 rounded-full"
+              style={{ background: bar }}
             />
-          </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-[#101D37]">
-            End
             <input
-              type="date"
-              required
-              value={end}
-              min={start}
-              onChange={(e) => setEnd(e.target.value)}
-              className={input}
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Add title"
+              aria-label="Title"
+              className="w-full min-w-0 border-b-2 border-[#EDEDF0] bg-transparent pb-1.5 text-xl leading-[1.3] font-semibold tracking-[-0.02em] text-[#101D37] outline-none placeholder:font-medium placeholder:text-body focus:border-blue"
             />
-          </label>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#101D37]">Status</span>
-          <div className="flex flex-wrap gap-2">
-            {STATUSES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={status === s}
-                onClick={() => setStatus(s)}
-                className={`rounded-lg ring-offset-1 ${status === s ? "ring-2 ring-blue" : "opacity-70 hover:opacity-100"}`}
-              >
-                <StatusPill status={s} />
-              </button>
-            ))}
           </div>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          {onDelete ? (
-            confirmDelete ? (
-              <span className="flex items-center gap-2 text-xs font-medium text-body">
-                Delete?
+
+          {/* date & time */}
+          <Row icon={Clock01Icon} label="Date and time">
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  aria-label="Start date"
+                  value={start}
+                  onChange={(e) => {
+                    setStart(e.target.value);
+                    if (e.target.value > end) setEnd(e.target.value);
+                  }}
+                  className={`${FIELD_BASE} w-auto`}
+                />
+                {!allDay && (
+                  <input
+                    type="time"
+                    aria-label="Start time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className={`${FIELD_BASE} w-auto`}
+                  />
+                )}
+                <span className="text-sm text-body">to</span>
+                {!allDay && (
+                  <input
+                    type="time"
+                    aria-label="End time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className={`${FIELD_BASE} w-auto`}
+                  />
+                )}
+                <input
+                  type="date"
+                  aria-label="End date"
+                  value={end}
+                  min={start}
+                  onChange={(e) => setEnd(e.target.value)}
+                  className={`${FIELD_BASE} w-auto`}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-[#101D37]">
+                  <input
+                    type="checkbox"
+                    checked={allDay}
+                    onChange={(e) => setAllDay(e.target.checked)}
+                    className="size-4 cursor-pointer accent-blue"
+                  />
+                  All day
+                </label>
+                <select
+                  aria-label="Repeat"
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value)}
+                  className={`${SELECT} h-9 w-auto`}
+                  style={{ backgroundImage: CHEVRON }}
+                >
+                  {REPEATS.map((r) => (
+                    <option key={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </Row>
+
+          {/* guests */}
+          <Row icon={UserGroupIcon} label="Guests">
+            <div className="flex flex-col gap-2">
+              <div className="relative">
+                <input
+                  value={guestText}
+                  onChange={(e) => setGuestText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault();
+                      addGuest(suggestions[0]?.name ?? guestText);
+                    }
+                  }}
+                  placeholder="Add guests by name or email"
+                  aria-label="Add guests"
+                  className={FIELD}
+                />
+                {suggestions.length > 0 && (
+                  <ul className="absolute top-11 right-0 left-0 z-10 flex flex-col overflow-hidden rounded-[10px] border border-[#EDEDF0] bg-white py-1 shadow-[0_14px_30px_0_rgba(16,29,55,0.12)]">
+                    {suggestions.map((p) => (
+                      <li key={p.email}>
+                        <button
+                          type="button"
+                          onClick={() => addGuest(p.name)}
+                          className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#F8F9FC]"
+                        >
+                          <GuestAvatar g={p.name} size={26} />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-[#101D37]">
+                              {p.name}
+                            </span>
+                            <span className="block truncate text-xs text-body">
+                              {p.email}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {guests.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-body">
+                    {guests.length} {guests.length === 1 ? "guest" : "guests"}
+                  </span>
+                  <ul className="flex flex-col">
+                    {guests.map((g) => {
+                      const p = personOf(g);
+                      return (
+                        <li
+                          key={g}
+                          className="group flex items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 hover:bg-[#F8F9FC]"
+                        >
+                          <GuestAvatar g={g} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-[#101D37]">
+                              {p?.name ?? g}
+                            </span>
+                            {p && (
+                              <span className="block truncate text-xs text-body">
+                                {p.designation}
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setGuests((l) => l.filter((x) => x !== g))
+                            }
+                            aria-label={`Remove ${p?.name ?? g}`}
+                            className="flex size-7 items-center justify-center rounded-md text-body opacity-60 hover:bg-white hover:text-[#F04438] group-hover:opacity-100"
+                          >
+                            <Icon
+                              icon={huge(Cancel01Icon)}
+                              size={14}
+                              stroke={1.6}
+                            />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Row>
+
+          {/* video call */}
+          <Row icon={Video01Icon} label="Video call">
+            {meetLink ? (
+              <div className="flex items-center gap-2">
+                <input
+                  value={meetLink}
+                  onChange={(e) => setMeetLink(e.target.value)}
+                  aria-label="Meeting link"
+                  className={FIELD}
+                />
                 <button
                   type="button"
-                  onClick={onDelete}
-                  className="h-8 rounded-[8px] bg-[#D92D20] px-2.5 text-xs font-semibold text-white hover:bg-[#B42318]"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(meetLink).catch(() => {});
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1200);
+                  }}
+                  aria-label="Copy meeting link"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[#EDEDF0] text-body hover:text-[#101D37]"
                 >
-                  Delete
+                  <Icon
+                    icon={huge(copied ? Tick02Icon : Copy01Icon)}
+                    size={16}
+                    stroke={1.6}
+                  />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setConfirmDelete(false)}
-                  className="text-xs font-semibold text-[#242C2C] hover:text-blue"
+                  onClick={() => setMeetLink("")}
+                  aria-label="Remove meeting link"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[#EDEDF0] text-body hover:text-[#F04438]"
                 >
-                  Keep
+                  <Icon icon={huge(Cancel01Icon)} size={16} stroke={1.6} />
                 </button>
-              </span>
+              </div>
             ) : (
               <button
                 type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="text-sm font-semibold text-[#D92D20] hover:text-[#B42318]"
+                onClick={() =>
+                  setMeetLink(
+                    `https://meet.artifexlabs.com/${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}`,
+                  )
+                }
+                className="flex h-10 items-center gap-1.5 rounded-[10px] bg-blue/[0.08] px-3 text-sm font-semibold text-blue hover:bg-blue/[0.14]"
               >
-                Delete
+                <Icon icon={huge(Link01Icon)} size={16} stroke={1.6} />
+                Add video call link
               </button>
-            )
-          ) : (
-            <span />
+            )}
+          </Row>
+
+          {/* location */}
+          <Row icon={Location01Icon} label="Location">
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Add location"
+              aria-label="Location"
+              className={FIELD}
+            />
+          </Row>
+
+          {/* agenda */}
+          <Row icon={TextAlignLeftIcon} label="Agenda">
+            <textarea
+              value={agenda}
+              onChange={(e) => setAgenda(e.target.value)}
+              placeholder="Add agenda or description"
+              aria-label="Agenda"
+              rows={3}
+              className={`${FIELD} h-auto min-h-[84px] resize-y py-2.5 leading-[1.5]`}
+            />
+          </Row>
+
+          {/* reminder */}
+          <Row icon={Notification01Icon} label="Reminder">
+            <select
+              aria-label="Reminder"
+              value={reminder}
+              onChange={(e) => setReminder(e.target.value)}
+              className={`${SELECT} w-full`}
+              style={{ backgroundImage: CHEVRON }}
+            >
+              {REMINDERS.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
+            </select>
+          </Row>
+
+          {/* status + progress (what the event card shows) */}
+          <Row icon={ChartLineData01Icon} label="Status and progress">
+            <div className="flex flex-col gap-3 rounded-[14px] border border-[#EDEDF0] bg-[#FAFAFA] p-3">
+              <div className="flex flex-wrap gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={status === s}
+                    onClick={() => setStatus(s)}
+                    className={`rounded-lg ring-offset-1 ${status === s ? "ring-2 ring-blue" : "opacity-70 hover:opacity-100"}`}
+                  >
+                    <StatusPill status={s} />
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3 text-sm text-[#101D37]">
+                <span className="shrink-0 font-medium">Progress</span>
+                <ProgressSlider value={progress} onChange={setProgress} />
+              </div>
+            </div>
+          </Row>
+        </div>
+
+        {/* footer */}
+        <div className="flex flex-col gap-2 border-t border-[#EDEDF0] px-5 py-3">
+          {error && (
+            <p role="alert" className="text-sm text-[#F04438]">
+              {error}
+            </p>
           )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-9 rounded-[10px] border border-[#EDEDF0] px-3 text-sm font-semibold text-[#242C2C]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="h-9 rounded-[10px] bg-blue px-3 text-sm font-semibold text-white"
-            >
-              {initial ? "Save" : "Add Event"}
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            {onDelete ? (
+              confirmDelete ? (
+                <span className="flex items-center gap-2 text-xs font-medium text-body">
+                  Delete this event?
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="h-8 rounded-[8px] bg-[#D92D20] px-2.5 text-xs font-semibold text-white hover:bg-[#B42318]"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="text-xs font-semibold text-[#242C2C] hover:text-blue"
+                  >
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex h-9 items-center gap-1.5 rounded-[10px] px-2 text-sm font-semibold text-[#D92D20] hover:bg-[#FEF3F2]"
+                >
+                  <Icon icon={huge(Delete02Icon)} size={16} stroke={1.6} />
+                  Delete
+                </button>
+              )
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 rounded-[10px] border border-[#EDEDF0] px-3 text-sm font-semibold text-[#242C2C]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="h-9 rounded-[10px] bg-blue px-4 text-sm font-semibold text-white"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </form>
@@ -760,6 +1169,23 @@ export default function CalendarBoard() {
     const saved = load();
     if (saved) setEvents(saved);
   }, []);
+
+  /* Filter menu closes on a click outside it or on Escape */
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!filterOpen) return;
+    const down = (e: MouseEvent) => {
+      if (!filterRef.current?.contains(e.target as Node)) setFilterOpen(false);
+    };
+    const key = (e: KeyboardEvent) =>
+      e.key === "Escape" && setFilterOpen(false);
+    document.addEventListener("mousedown", down);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("mousedown", down);
+      document.removeEventListener("keydown", key);
+    };
+  }, [filterOpen]);
 
   const update = (fn: (l: CalEvent[]) => CalEvent[]) =>
     setEvents((prev) => {
@@ -807,7 +1233,7 @@ export default function CalendarBoard() {
             <Icon icon={untitled(Calendar)} size={16} />
             Calendar
           </ToolbarButton>
-          <div className="relative">
+          <div ref={filterRef} className="relative">
             <ToolbarButton
               active={filter.length !== STATUSES.length}
               onClick={() => setFilterOpen((o) => !o)}

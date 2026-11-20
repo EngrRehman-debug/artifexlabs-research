@@ -26,6 +26,7 @@
     "@tiptap/starter-kit": "^3.32.2",
     "@untitledui/icons": "^0.0.23",
     "next": "^15.5.29",
+    "pptxgenjs": "4.0.1",
     "react": "19.1.x",
     "react-dom": "19.1.x"
   },

@@ -10,7 +10,23 @@ export type CalEvent = {
   progress: number;
   /** extra people beyond the two avatars */
   more: number;
+  /* Google-Calendar-style details (all optional, older saved events don't have them) */
+  allDay?: boolean;
+  /** "HH:MM" */
+  startTime?: string;
+  endTime?: string;
+  repeat?: string;
+  /** invited people (names or email addresses) */
+  guests?: string[];
+  meetLink?: string;
+  location?: string;
+  /** agenda / description */
+  agenda?: string;
+  reminder?: string;
 };
+
+export const REPEATS = ["Does not repeat", "Daily", "Weekly on this day", "Every 2 weeks", "Monthly"];
+export const REMINDERS = ["No reminder", "10 minutes before", "30 minutes before", "1 hour before", "1 day before"];
 
 export const STATUSES: EventStatus[] = ["Draft", "Scheduled", "Active", "Ended"];
 

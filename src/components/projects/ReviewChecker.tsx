@@ -1,11 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckmarkCircle02Icon, Edit02Icon, Message01Icon } from "@hugeicons/core-free-icons";
+import {
+  CheckmarkCircle02Icon,
+  Edit02Icon,
+  Message01Icon,
+} from "@hugeicons/core-free-icons";
 import Icon, { huge } from "@/components/dashboard/Icon";
 import { REVIEW_ITEMS } from "@/lib/projectScreens";
 
-type Decision = { verdict: "Approved" | "Changes requested"; note: string; at: string };
+type Decision = {
+  verdict: "Approved" | "Changes requested";
+  note: string;
+  at: string;
+};
 
 /** Figma "Review Checker": list of review items; the open one shows "Reviewer Decision"
  *  with a note box and Approve / Request Changes. Decisions are kept in this browser. */
@@ -26,9 +34,13 @@ export default function ReviewChecker({ storageKey }: { storageKey: string }) {
 
   const decide = (id: string, verdict: Decision["verdict"]) => {
     const note = (notes[id] ?? "").trim();
-    if (verdict === "Changes requested" && !note) return setError("Write what needs to change before requesting changes.");
+    if (verdict === "Changes requested" && !note)
+      return setError("Write what needs to change before requesting changes.");
     setError(null);
-    const next = { ...decisions, [id]: { verdict, note, at: new Date().toISOString() } };
+    const next = {
+      ...decisions,
+      [id]: { verdict, note, at: new Date().toISOString() },
+    };
     setDecisions(next);
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
@@ -57,7 +69,10 @@ export default function ReviewChecker({ storageKey }: { storageKey: string }) {
         const on = open === r.id;
         const dec = decisions[r.id];
         return (
-          <li key={r.id} className="rounded-2xl border border-[#EDEDF0] bg-white">
+          <li
+            key={r.id}
+            className="rounded-2xl border border-[#EDEDF0] bg-white"
+          >
             <button
               type="button"
               aria-expanded={on}
@@ -69,12 +84,19 @@ export default function ReviewChecker({ storageKey }: { storageKey: string }) {
                 on ? "text-[#101D37]" : "text-body hover:text-[#101D37]"
               }`}
             >
-              <Icon icon={huge(Message01Icon)} size={16} stroke={1.3} className="shrink-0" />
+              <Icon
+                icon={huge(Message01Icon)}
+                size={16}
+                stroke={1.3}
+                className="shrink-0"
+              />
               <span className="min-w-0 flex-1">{r.title}</span>
               {dec && (
                 <span
                   className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${
-                    dec.verdict === "Approved" ? "bg-[#2BCB23]/10 text-[#2BCB23]" : "bg-[#FF2020]/10 text-[#FF6720]"
+                    dec.verdict === "Approved"
+                      ? "bg-[#2BCB23]/10 text-[#2BCB23]"
+                      : "bg-[#FF2020]/10 text-[#FF6720]"
                   }`}
                 >
                   {dec.verdict}
@@ -88,20 +110,33 @@ export default function ReviewChecker({ storageKey }: { storageKey: string }) {
                   <div className="flex flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] p-4 text-sm leading-[1.6] text-body">
                     <span className="font-semibold text-[#101D37]">
                       {dec.verdict} ·{" "}
-                      {new Date(dec.at).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(dec.at).toLocaleString([], {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </span>
                     {dec.note && <span>{dec.note}</span>}
-                    <button type="button" onClick={() => undo(r.id)} className="self-start font-semibold text-blue hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => undo(r.id)}
+                      className="self-start font-semibold text-blue hover:underline"
+                    >
                       Change decision
                     </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] p-4">
                     <label className="flex flex-col gap-2.5">
-                      <span className="text-sm leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">Reviewer Decision</span>
+                      <span className="text-sm leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">
+                        Reviewer Decision
+                      </span>
                       <textarea
                         value={notes[r.id] ?? ""}
-                        onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))}
+                        onChange={(e) =>
+                          setNotes((n) => ({ ...n, [r.id]: e.target.value }))
+                        }
                         rows={3}
                         placeholder="Write here.."
                         className="h-[88px] resize-none rounded-xl border border-[#EDEDF0] bg-white px-3 py-2.5 text-sm leading-[1.5] text-[#101D37] outline-none placeholder:text-body focus:border-blue"
@@ -118,7 +153,11 @@ export default function ReviewChecker({ storageKey }: { storageKey: string }) {
                         onClick={() => decide(r.id, "Approved")}
                         className="flex h-8 items-center gap-1.5 rounded-lg bg-blue px-3 text-[13px] font-semibold text-white"
                       >
-                        <Icon icon={huge(CheckmarkCircle02Icon)} size={14} stroke={1.5} />
+                        <Icon
+                          icon={huge(CheckmarkCircle02Icon)}
+                          size={14}
+                          stroke={1.5}
+                        />
                         Approve
                       </button>
                       <button

@@ -1,10 +1,12 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Folder, Rows01 } from "@untitledui/icons";
 import {
   ArrowUpRight01Icon,
   Calendar03Icon,
   Clock01Icon,
   FlashIcon,
+  File02Icon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge, untitled } from "@/components/dashboard/Icon";
 import TopBar from "@/components/dashboard/TopBar";
@@ -38,21 +40,48 @@ const HEAD_GRID = "grid grid-cols-[minmax(0,1fr)_212px_101px] items-center";
 
 /** Figma "Projects - Overview" page. No hooks, so it renders on the server (sample
  *  projects) and in the browser (projects created in the New Project chat). */
-export default function ProjectOverview({ project, stats, upcoming, workPackages }: OverviewData) {
+export default function ProjectOverview({
+  project,
+  stats,
+  upcoming,
+  workPackages,
+  extra,
+}: OverviewData & {
+  /** shown under the stats (AI assessment of created projects) */
+  extra?: React.ReactNode;
+}) {
   const slug = project.slug;
   return (
     <div className="flex min-w-0 flex-1">
-      <ProjectsPanel activeSlug={slug} newLabel="New Projects" showWorkPackages />
+      <ProjectsPanel
+        activeSlug={slug}
+        newLabel="New Projects"
+        showWorkPackages
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar current="Overview" trail={[{ label: "Projects", href: "/projects" }]} />
+        <TopBar
+          current="Overview"
+          trail={[{ label: "Projects", href: "/projects" }]}
+        />
 
         <main className="px-4 pt-10 pb-16 sm:px-6 lg:px-10">
           {/* Figma: Frame 2147232172 – 885 wide at (515, 104), gap 20 */}
           <div className="flex w-full flex-col gap-5">
-            <h1 className="text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-[30px]">
-              <span className="text-blue">{project.title[0]}</span> {project.title[1]}
-            </h1>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-[#101D37] sm:text-[30px]">
+                <span className="text-blue">{project.title[0]}</span>{" "}
+                {project.title[1]}
+              </h1>
+              <Link
+                href={`/projects/${slug}/report`}
+                title="Open the research case slides and export them as PDF"
+                className="flex h-9 items-center gap-1.5 rounded-[10px] bg-blue px-3 text-sm font-semibold text-white"
+              >
+                <Icon icon={huge(File02Icon)} size={16} stroke={1.6} />
+                Research Case
+              </Link>
+            </div>
 
             {/* Stats – 4 cards, 212.25 wide, gap 12 */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -67,11 +96,18 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                   </span>
                   <span className="flex items-center justify-between gap-2 text-base leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">
                     {s.label}
-                    <Icon icon={huge(ArrowUpRight01Icon)} size={20} stroke={1.8} className="shrink-0" />
+                    <Icon
+                      icon={huge(ArrowUpRight01Icon)}
+                      size={20}
+                      stroke={1.8}
+                      className="shrink-0"
+                    />
                   </span>
                 </a>
               ))}
             </div>
+
+            {extra}
 
             {/* Upcoming – #FAFAFA card, radius 20, padding 20, gap 12 */}
             <section className="flex flex-col gap-3 rounded-[20px] border border-[#EDEDF0] bg-[#FAFAFA] p-5 shadow-[0_14px_30px_0_rgba(40,92,224,0.02)]">
@@ -100,7 +136,11 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                     className="flex flex-col gap-3 rounded-2xl border border-[#EDEDF0] bg-white px-4 py-5"
                   >
                     <div className="flex items-start gap-2.5">
-                      <Icon icon={untitled(Folder)} size={20} className="mt-0.5 shrink-0 text-[#242C2C]" />
+                      <Icon
+                        icon={untitled(Folder)}
+                        size={20}
+                        className="mt-0.5 shrink-0 text-[#242C2C]"
+                      />
                       <div className="min-w-0">
                         <p className="text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-[#242C2C]">
                           {u.title}
@@ -113,7 +153,11 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                     <div className="h-px w-full bg-[#EDEDF0]" />
                     <div className="flex flex-wrap items-center gap-2.5">
                       <Chip>
-                        <Icon icon={huge(Calendar03Icon)} size={14} stroke={1.2} />
+                        <Icon
+                          icon={huge(Calendar03Icon)}
+                          size={14}
+                          stroke={1.2}
+                        />
                         {u.start}
                       </Chip>
                       <Chip>
@@ -185,7 +229,11 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                           className={`${ROW_GRID} min-h-[60.12px] rounded-2xl border border-[#EDEDF0] bg-white px-[18.18px] py-2.5`}
                         >
                           <div className="flex min-w-0 items-center gap-2.5">
-                            <Icon icon={untitled(Folder)} size={20} className="shrink-0 text-[#242C2C]" />
+                            <Icon
+                              icon={untitled(Folder)}
+                              size={20}
+                              className="shrink-0 text-[#242C2C]"
+                            />
                             <div className="min-w-0">
                               <p className="truncate text-sm leading-[1.5] font-semibold tracking-[-0.02em] text-[#242C2C]">
                                 {w.title}
@@ -213,7 +261,6 @@ export default function ProjectOverview({ project, stats, upcoming, workPackages
                 </div>
               </div>
             </section>
-
           </div>
         </main>
       </div>

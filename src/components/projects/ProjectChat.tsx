@@ -2,7 +2,22 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Add01Icon, Cancel01Icon, Clock01Icon, Image02Icon, Mic01Icon, Pdf02Icon, SentIcon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  Cancel01Icon,
+  Clock01Icon,
+  Image02Icon,
+  Pdf02Icon,
+  SentIcon,
+} from "@hugeicons/core-free-icons";
+import {
+  MicButton,
+  RecordingBar,
+  VoiceChip,
+  VoiceError,
+  useVoiceRecorder,
+  type VoiceNote,
+} from "@/components/voice/Voice";
 import Icon, { huge } from "@/components/dashboard/Icon";
 import { initialChats, type ChatMessage } from "@/lib/projectScreens";
 import { CURRENT_USER } from "@/lib/workspaceDoc";
@@ -13,11 +28,23 @@ const ago = (iso: string, now: number) => {
   if (m < 60) return `${m} min${m === 1 ? "" : "s"} ago`;
   const h = Math.round(m / 60);
   if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 };
 
 function Avatar({ name, src }: { name: string; src?: string }) {
-  if (src) return <Image src={src} alt="" width={36} height={36} className="size-[18px] shrink-0 rounded-full object-cover" />;
+  if (src)
+    return (
+      <Image
+        src={src}
+        alt=""
+        width={36}
+        height={36}
+        className="size-[18px] shrink-0 rounded-full object-cover"
+      />
+    );
   return (
     <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-blue/10 text-[9px] font-semibold text-blue">
       {name[0]}
@@ -32,6 +59,8 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
   const [files, setFiles] = useState<string[]>([]);
+  const [notes, setNotes] = useState<VoiceNote[]>([]);
+  const rec = useVoiceRecorder({ onDone: (n) => setNotes((l) => [...l, n]) });
   const [now, setNow] = useState(() => Date.now());
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,13 +84,17 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
   /* keep the newest message in view */
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: loaded.current ? "smooth" : "auto" });
+    if (el)
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: loaded.current ? "smooth" : "auto",
+      });
   }, [msgs.length]);
 
   const send = (e?: React.FormEvent) => {
     e?.preventDefault();
     const body = text.trim();
-    if (!body && !files.length) return;
+    if (!body && !files.length && !notes.length) return;
     const msg: ChatMessage = {
       id: `m${Date.now()}`,
       author: CURRENT_USER.name,
@@ -69,6 +102,7 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
       text: body,
       at: new Date().toISOString(),
       files: files.length ? files : undefined,
+      voices: notes.length ? notes : undefined,
       mine: true,
     };
     const next = [...msgs, msg];
@@ -76,6 +110,7 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
     setNow(Date.now());
     setText("");
     setFiles([]);
+    setNotes([]);
     try {
       localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
@@ -85,7 +120,11 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
 
   return (
     <section className="flex h-[calc(100dvh-224px)] min-h-[480px] w-full flex-col gap-[30px] rounded-2xl border border-[#EDEDF0] bg-white p-4">
-      <div ref={listRef} className="chat-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2.5" aria-live="polite">
+      <div
+        ref={listRef}
+        className="chat-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2.5"
+        aria-live="polite"
+      >
         {msgs.map((m) => (
           <div
             key={m.id}
@@ -101,16 +140,33 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
                     title={f}
                     className="flex size-9 items-center justify-center rounded-lg border border-[#EDEDF0] bg-white text-[#101D37]"
                   >
-                    <Icon icon={huge(/\.pdf$/i.test(f) ? Pdf02Icon : Image02Icon)} size={16} stroke={1.4} />
+                    <Icon
+                      icon={huge(/\.pdf$/i.test(f) ? Pdf02Icon : Image02Icon)}
+                      size={16}
+                      stroke={1.4}
+                    />
                   </span>
                 ))}
               </div>
             )}
-            {m.text && <p className="text-xs leading-[1.5] tracking-[-0.02em] break-words text-[#101D37]">{m.text}</p>}
+            {m.voices && (
+              <div className="flex flex-col gap-1.5">
+                {m.voices.map((v) => (
+                  <VoiceChip key={v.id} note={v} compact />
+                ))}
+              </div>
+            )}
+            {m.text && (
+              <p className="text-xs leading-[1.5] tracking-[-0.02em] break-words text-[#101D37]">
+                {m.text}
+              </p>
+            )}
             <div className="flex items-center gap-2.5">
               <span className="flex items-center gap-1">
                 <Avatar name={m.author} src={m.avatar} />
-                <span className="text-xs leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">{m.mine ? "You" : m.author}</span>
+                <span className="text-xs leading-[1.5] font-medium tracking-[-0.02em] text-[#101D37]">
+                  {m.mine ? "You" : m.author}
+                </span>
               </span>
               <span className="flex items-center gap-1 text-[10px] leading-[1.5] tracking-[-0.02em] text-body">
                 <Icon icon={huge(Clock01Icon)} size={12} stroke={1.4} />
@@ -121,13 +177,39 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
         ))}
       </div>
 
-      <form onSubmit={send} className="flex shrink-0 flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] p-2.5">
+      <form
+        onSubmit={send}
+        className="flex shrink-0 flex-col gap-2 rounded-xl border border-[#EDEDF0] bg-[#FAFAFA] p-2.5"
+      >
+        {notes.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {notes.map((n) => (
+              <VoiceChip
+                key={n.id}
+                note={n}
+                compact
+                onRemove={() => setNotes((l) => l.filter((x) => x.id !== n.id))}
+              />
+            ))}
+          </div>
+        )}
+        <VoiceError rec={rec} />
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1">
             {files.map((f, i) => (
-              <span key={`${f}-${i}`} className="flex h-7 max-w-[200px] items-center gap-1.5 rounded-lg border border-[#EDEDF0] bg-white px-2 text-[11px] text-[#242C2C]">
+              <span
+                key={`${f}-${i}`}
+                className="flex h-7 max-w-[200px] items-center gap-1.5 rounded-lg border border-[#EDEDF0] bg-white px-2 text-[11px] text-[#242C2C]"
+              >
                 <span className="truncate">{f}</span>
-                <button type="button" aria-label={`Remove ${f}`} onClick={() => setFiles((all) => all.filter((_, j) => j !== i))} className="text-body">
+                <button
+                  type="button"
+                  aria-label={`Remove ${f}`}
+                  onClick={() =>
+                    setFiles((all) => all.filter((_, j) => j !== i))
+                  }
+                  className="text-body"
+                >
                   <Icon icon={huge(Cancel01Icon)} size={12} stroke={1.4} />
                 </button>
               </span>
@@ -135,7 +217,12 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
           </div>
         )}
         <div className="flex items-center gap-2">
-          <button type="button" aria-label="Attach files" onClick={() => fileRef.current?.click()} className="flex size-8 shrink-0 items-center justify-center text-body hover:text-[#101D37]">
+          <button
+            type="button"
+            aria-label="Attach files"
+            onClick={() => fileRef.current?.click()}
+            className="flex size-8 shrink-0 items-center justify-center text-body hover:text-[#101D37]"
+          >
             <Icon icon={huge(Add01Icon)} size={16} stroke={1.4} />
           </button>
           <input
@@ -145,30 +232,31 @@ export default function ProjectChat({ storageKey }: { storageKey: string }) {
             hidden
             accept="image/*,application/pdf"
             onChange={(e) => {
-              const picked = Array.from(e.target.files ?? []).map((f) => f.name);
+              const picked = Array.from(e.target.files ?? []).map(
+                (f) => f.name,
+              );
               setFiles((all) => [...all, ...picked]);
               e.target.value = "";
             }}
           />
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Write Here"
-            aria-label="Message"
-            className="h-9 min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
-          />
-          <button
-            type="button"
-            aria-label="Voice message (coming soon)"
-            title="Voice messages are coming soon"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#EDEDF0] bg-white text-body"
-          >
-            <Icon icon={huge(Mic01Icon)} size={15} stroke={1.4} />
-          </button>
+          {rec.active ? (
+            <RecordingBar rec={rec} className="h-9" />
+          ) : (
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Write Here"
+              aria-label="Message"
+              className="h-9 min-w-0 flex-1 bg-transparent text-sm text-[#101D37] outline-none placeholder:text-body"
+            />
+          )}
+          {!rec.active && <MicButton rec={rec} size={32} />}
           <button
             type="submit"
             aria-label="Send"
-            disabled={!text.trim() && !files.length}
+            disabled={
+              (!text.trim() && !files.length && !notes.length) || rec.active
+            }
             className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue text-white disabled:opacity-40"
           >
             <Icon icon={huge(SentIcon)} size={15} stroke={1.5} />

@@ -222,3 +222,41 @@ button:disabled,
 .doc-editor-host .e-ribbon .e-ribbon-file-menu:focus-visible {
   box-shadow: 0 0 0 2px rgba(40, 92, 224, 0.35) !important;
 }
+
+/* ---------- Research case deck: print = one 960×540 slide per PDF page ---------- */
+.deck-print {
+  display: none;
+}
+@media print {
+  @page {
+    size: 960px 540px;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body > *:not(.deck-print) {
+    display: none !important;
+  }
+  .deck-print {
+    display: block !important;
+  }
+  .deck-print .deck-page {
+    width: 960px;
+    height: 540px;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+  }
+  .deck-print .deck-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  .deck-print * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

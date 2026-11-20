@@ -88,6 +88,8 @@ export type ChatMessage = {
   /** ISO time */
   at: string;
   files?: string[];
+  /** voice notes (data URLs, so they replay after a reload) */
+  voices?: { id: string; name: string; src: string; duration: number; mime: string }[];
   mine?: boolean;
 };
 

@@ -2,19 +2,37 @@
 
 import { useSyncExternalStore } from "react";
 import type { Draft } from "./newProject";
+import type { ProjectInsights } from "./ai/types";
 import { PROJECTS, type Priority, type Project, type Status } from "./projects";
 
 /* Projects made in the New Project chat live in this browser's localStorage (no backend yet). */
 export const CREATED_KEY = "projects:created";
 const EVENT = "projects:created-change";
 
-export type CreatedProject = Draft & { id: string; createdAt: string };
+export type CreatedProject = Draft & {
+  id: string;
+  createdAt: string;
+  /** first AI assessment (summary, stats, risk analysis), written at create time */
+  insights?: ProjectInsights;
+};
 
 export type OverviewData = {
   project: Project;
-  stats: { value: number; label: string }[];
-  upcoming: { title: string; subtitle: string; start: string; end: string; priority: Priority }[];
-  workPackages: { title: string; subtitle: string; owner: string; team: string; status: Status }[];
+  stats: { value: number | string; label: string }[];
+  upcoming: {
+    title: string;
+    subtitle: string;
+    start: string;
+    end: string;
+    priority: Priority;
+  }[];
+  workPackages: {
+    title: string;
+    subtitle: string;
+    owner: string;
+    team: string;
+    status: Status;
+  }[];
 };
 
 const readRaw = (): string => {
@@ -28,7 +46,11 @@ const readRaw = (): string => {
 const parse = (raw: string): CreatedProject[] => {
   try {
     const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.filter((p) => p && typeof p.id === "string" && typeof p.name === "string") : [];
+    return Array.isArray(list)
+      ? list.filter(
+          (p) => p && typeof p.id === "string" && typeof p.name === "string",
+        )
+      : [];
   } catch {
     return [];
   }
@@ -38,8 +60,16 @@ export function readCreated(): CreatedProject[] {
   return parse(readRaw());
 }
 
-export function addCreated(d: Draft): CreatedProject {
-  const p: CreatedProject = { ...d, id: `p${Date.now()}`, createdAt: new Date().toISOString() };
+export function addCreated(
+  d: Draft,
+  insights?: ProjectInsights,
+): CreatedProject {
+  const p: CreatedProject = {
+    ...d,
+    id: `p${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    insights,
+  };
   try {
     localStorage.setItem(CREATED_KEY, JSON.stringify([...readCreated(), p]));
     window.dispatchEvent(new Event(EVENT));
@@ -49,6 +79,21 @@ export function addCreated(d: Draft): CreatedProject {
   return p;
 }
 
+/** Save new AI insights on a created project. */
+export function setInsights(id: string, insights: ProjectInsights) {
+  try {
+    localStorage.setItem(
+      CREATED_KEY,
+      JSON.stringify(
+        readCreated().map((p) => (p.id === id ? { ...p, insights } : p)),
+      ),
+    );
+    window.dispatchEvent(new Event(EVENT));
+  } catch {
+    /* storage full or blocked */
+  }
+}
+
 export const slugFor = (p: Pick<CreatedProject, "id">) => `new-${p.id}`;
 
 export function toProject(p: CreatedProject, index: number): Project {
@@ -56,7 +101,10 @@ export function toProject(p: CreatedProject, index: number): Project {
   return {
     slug: slugFor(p),
     name: p.name,
-    title: words.length > 1 ? [words.slice(0, -1).join(" "), words[words.length - 1]] : [words[0] ?? "", ""],
+    title:
+      words.length > 1
+        ? [words.slice(0, -1).join(" "), words[words.length - 1]]
+        : [words[0] ?? "", ""],
     code: `P-${String(13 + index).padStart(3, "0")}`,
     lead: p.lead || "Not assigned",
     workPackages: p.workstreams.length,
@@ -66,8 +114,17 @@ export function toProject(p: CreatedProject, index: number): Project {
 }
 
 const fmt = (iso: string) =>
-  iso ? new Date(iso + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "TBD";
-const PRIORITY: Record<string, Priority> = { Critical: "High", High: "High", Normal: "Medium" };
+  iso
+    ? new Date(iso + "T00:00").toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      })
+    : "TBD";
+const PRIORITY: Record<string, Priority> = {
+  Critical: "High",
+  High: "High",
+  Normal: "Medium",
+};
 
 /** Overview page content built from what the user answered in the chat. */
 export function toOverview(p: CreatedProject, index: number): OverviewData {
@@ -75,12 +132,17 @@ export function toOverview(p: CreatedProject, index: number): OverviewData {
   const priority = PRIORITY[p.priority] ?? "Medium";
   return {
     project,
-    stats: [
-      { value: p.workstreams.length, label: "Work Packages" },
-      { value: p.gates.length, label: "Decision Gates" },
-      { value: p.risks.filter((r) => r.risk.trim()).length, label: "Risks" },
-      { value: p.departments.length, label: "Departments" },
-    ],
+    stats: p.insights?.stats.length
+      ? p.insights.stats
+      : [
+          { value: p.workstreams.length, label: "Work Packages" },
+          { value: p.gates.length, label: "Decision Gates" },
+          {
+            value: p.risks.filter((r) => r.risk.trim()).length,
+            label: "Risks",
+          },
+          { value: p.departments.length, label: "Departments" },
+        ],
     upcoming: p.gates
       .filter((g) => g.name.trim())
       .map((g) => ({

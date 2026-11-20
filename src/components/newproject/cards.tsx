@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Add01Icon,
   Alert02Icon,
@@ -19,6 +19,7 @@ import {
   TradeUpIcon,
 } from "@hugeicons/core-free-icons";
 import Icon, { huge } from "@/components/dashboard/Icon";
+import { panelFor, useKnowledge } from "@/lib/knowledge";
 import {
   APPROACHES,
   CONTROL_FIELDS,
@@ -79,6 +80,8 @@ export type StepCtx = Ctx & {
   confirm: () => void;
   jump: (id: string) => void;
   create: () => void;
+  /** the AI is writing the project's first assessment */
+  creating?: boolean;
   saveDraft: () => void;
   saved: boolean;
   error: string | null;
@@ -191,6 +194,7 @@ function EditButton({
   return (
     <button
       type="button"
+      data-action
       onClick={onClick}
       aria-pressed={editing}
       className={
@@ -211,7 +215,7 @@ function EditButton({
 
 function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={BLUE_BTN}>
+    <button type="button" data-action onClick={onClick} className={BLUE_BTN}>
       <Icon icon={huge(Add01Icon)} size={16} stroke={1.8} />
       {label}
     </button>
@@ -222,6 +226,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
+      data-action
       onClick={onClick}
       className="flex h-9 items-center gap-1.5 rounded-[10px] border border-[#EDEDF0] bg-white px-3 py-2 text-sm font-medium text-[#101D37] hover:border-[#F04438]/40 hover:text-[#F04438]"
     >
@@ -253,7 +258,7 @@ function Footer({
   confirmLabel?: string;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div data-action className="flex flex-col gap-2">
       <ErrorLine text={c.error} />
       <div className="flex items-center gap-2.5">
         {c.back && (
@@ -282,10 +287,13 @@ export function KvRow({
   children,
   top,
   wide,
+  invalid,
 }: {
   label: ReactNode;
   ai?: boolean;
   children: ReactNode;
+  /** required and still empty after "Confirm": red border + "Required" */
+  invalid?: boolean;
   /** align label to the top (multi-line values) */
   top?: boolean;
   /** Figma item rows (workstreams, gates, risks) use a 222px label column */
@@ -295,14 +303,159 @@ export function KvRow({
     <div
       className={`grid gap-x-2.5 gap-y-1.5 ${wide ? "sm:grid-cols-[minmax(0,222px)_minmax(0,1fr)]" : "sm:grid-cols-[184px_minmax(0,1fr)]"} ${top ? "items-start" : "items-center"}`}
     >
-      <span className={`${LABEL} ${top ? "sm:pt-[17px]" : ""}`}>{label}</span>
-      <div className="flex min-h-[62px] items-center gap-2 rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 transition-colors focus-within:border-blue">
-        <div className="min-w-0 flex-1 text-base leading-[1.5] tracking-[-0.02em] text-[#101D37]">
-          {children}
+      <span className={`${LABEL} ${top ? "sm:pt-[17px]" : ""}`}>
+        {label}
+        {invalid && <span className="ml-0.5 text-[#F04438]">*</span>}
+      </span>
+      <div className="flex min-w-0 flex-col gap-1">
+        <div
+          data-invalid={invalid || undefined}
+          className={`flex min-h-[62px] items-center gap-2 rounded-[14px] border px-4 py-3 transition-colors ${
+            invalid
+              ? "border-[#F04438] bg-[#FEF3F2] focus-within:border-[#F04438]"
+              : "border-[#EDEDF0] bg-white focus-within:border-blue"
+          }`}
+        >
+          <div className="min-w-0 flex-1 text-base leading-[1.5] tracking-[-0.02em] text-[#101D37]">
+            {children}
+          </div>
+          {ai && <AiChip />}
         </div>
-        {ai && <AiChip />}
+        {invalid && <RequiredNote />}
       </div>
     </div>
+  );
+}
+
+function RequiredNote({ text = "Required" }: { text?: string }) {
+  return (
+    <span className="flex items-center gap-1 text-xs font-medium text-[#F04438]">
+      <Icon icon={huge(Alert02Icon)} size={13} stroke={1.6} />
+      {text}
+    </span>
+  );
+}
+
+/** Styled dropdown (replaces the browser's native select): keyboard, outside click, opens up near the bottom. */
+function SelectBox({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  tone,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+  tone?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const [up, setUp] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", down);
+    return () => document.removeEventListener("mousedown", down);
+  }, [open]);
+  useEffect(() => {
+    if (open)
+      list.current
+        ?.querySelector<HTMLElement>(`[data-i="${hi}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+  }, [hi, open]);
+
+  const openList = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setUp(window.innerHeight - r.bottom < 280 && r.top > 280);
+    setHi(Math.max(0, options.indexOf(value)));
+    setOpen(true);
+  };
+  const choose = (o: string) => {
+    onChange(o);
+    setOpen(false);
+  };
+
+  return (
+    <span ref={ref} className="relative block">
+      <button
+        type="button"
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            if (!open) return openList();
+            const n = options.length;
+            setHi((h) => (h + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+          } else if ((e.key === "Enter" || e.key === " ") && open) {
+            e.preventDefault();
+            if (options[hi]) choose(options[hi]);
+          } else if (e.key === "Escape") setOpen(false);
+        }}
+        className="flex w-full min-w-0 items-center justify-between gap-2 text-left text-base leading-[1.5] tracking-[-0.02em] outline-none"
+      >
+        <span
+          className={`truncate ${value ? (tone ?? "text-[#101D37]") : "text-body"}`}
+        >
+          {value || placeholder || "Choose"}
+        </span>
+        <Icon
+          icon={huge(ArrowDown01Icon)}
+          size={16}
+          className={`shrink-0 text-body transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <ul
+          ref={list}
+          role="listbox"
+          aria-label={label}
+          className={`absolute -right-4 -left-4 z-30 max-h-64 overflow-y-auto rounded-[14px] border border-[#EDEDF0] bg-white p-1.5 shadow-[0_14px_30px_0_rgba(16,29,55,0.14)] ${up ? "bottom-full mb-4" : "top-full mt-4"}`}
+        >
+          {options.length === 0 && (
+            <li className="px-3 py-2 text-sm text-body">No options</li>
+          )}
+          {options.map((o, i) => {
+            const on = o === value;
+            return (
+              <li
+                key={o}
+                data-i={i}
+                role="option"
+                aria-selected={on}
+                onMouseEnter={() => setHi(i)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(o)}
+                className={`flex cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2.5 text-sm leading-[1.4] ${
+                  i === hi ? "bg-[#F2F4F7]" : ""
+                } ${on ? "font-semibold text-blue" : "text-[#101D37]"}`}
+              >
+                <span className="min-w-0">{o}</span>
+                {on && (
+                  <Icon
+                    icon={huge(Tick02Icon)}
+                    size={16}
+                    stroke={2}
+                    className="shrink-0"
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </span>
   );
 }
 
@@ -342,26 +495,14 @@ export function Val({
   }
   if (kind === "select")
     return (
-      <span className="relative flex items-center">
-        <select
-          aria-label={label}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={`${INPUT} cursor-pointer appearance-none pr-6 ${value ? (tone ?? "") : "text-body"}`}
-        >
-          {!value && <option value="">{placeholder ?? "Choose"}</option>}
-          {options?.map((o) => (
-            <option key={o} value={o} className="text-[#101D37]">
-              {o}
-            </option>
-          ))}
-        </select>
-        <Icon
-          icon={huge(ArrowDown01Icon)}
-          size={16}
-          className="pointer-events-none absolute right-0 text-body"
-        />
-      </span>
+      <SelectBox
+        label={label}
+        value={value}
+        options={options ?? []}
+        onChange={onChange}
+        placeholder={placeholder}
+        tone={tone}
+      />
     );
   if (kind === "area")
     return (
@@ -507,11 +648,28 @@ function Block({
 }
 
 /** Label above a full-width white input (Figma "External Organizations", "Evidence And Acceptance Criteria"). */
-function Stacked({ label, children }: { label: string; children: ReactNode }) {
+function Stacked({
+  label,
+  children,
+  invalid,
+  note,
+}: {
+  label: string;
+  children: ReactNode;
+  invalid?: boolean;
+  note?: string;
+}) {
   return (
-    <div className="flex flex-col gap-2.5">
-      <span className={LABEL}>{label}</span>
+    <div
+      className="flex flex-col gap-2.5"
+      data-invalid-group={invalid || undefined}
+    >
+      <span className={LABEL}>
+        {label}
+        {invalid && <span className="ml-0.5 text-[#F04438]">*</span>}
+      </span>
       {children}
+      {invalid && <RequiredNote text={note} />}
     </div>
   );
 }
@@ -522,15 +680,24 @@ function TextBox({
   onChange,
   placeholder,
   label,
+  invalid,
 }: {
   editing: boolean;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   label: string;
+  invalid?: boolean;
 }) {
   return (
-    <div className="flex min-h-[46px] items-center rounded-[14px] border border-[#EDEDF0] bg-white px-4 py-3 focus-within:border-blue">
+    <div
+      data-invalid={invalid || undefined}
+      className={`flex min-h-[46px] items-center rounded-[14px] border px-4 py-3 ${
+        invalid
+          ? "border-[#F04438] bg-[#FEF3F2]"
+          : "border-[#EDEDF0] bg-white focus-within:border-blue"
+      }`}
+    >
       <Val
         label={label}
         editing={editing}
@@ -642,7 +809,11 @@ function CharterStep(c: StepCtx) {
         action={<EditButton editing={editing} onClick={c.toggleEdit} />}
       >
         <Panel>
-          <KvRow label="Project name" ai={ai("name")}>
+          <KvRow
+            label="Project name"
+            ai={ai("name")}
+            invalid={!!c.error && !d.name.trim()}
+          >
             <Val
               label="Project name"
               editing={editing}
@@ -1066,6 +1237,8 @@ function OrganizationStep(c: StepCtx) {
 /** Figma 3 – Workstreams + Decision Gates */
 function DeliveryStep(c: StepCtx) {
   const { d, set, ai } = c;
+  /* after a failed "Confirm", the missing required values turn red */
+  const show = !!c.error;
   const aiWs = ai("workstreams");
   const aiGates = ai("gates");
   const setWs = (i: number, p: Partial<Workstream>) =>
@@ -1103,6 +1276,7 @@ function DeliveryStep(c: StepCtx) {
             w={w}
             d={d}
             ai={aiWs}
+            show={show}
             up={(p) => setWs(i, p)}
             remove={() =>
               set((x) => ({
@@ -1135,7 +1309,12 @@ function DeliveryStep(c: StepCtx) {
               set((x) => ({ gates: x.gates.filter((_, j) => j !== i) }))
             }
           >
-            <KvRow wide label="Decision Gate" ai={aiGates && !!g.name}>
+            <KvRow
+              wide
+              label="Decision Gate"
+              ai={aiGates && !!g.name}
+              invalid={show && !g.name.trim()}
+            >
               <Val
                 label="Decision Gate"
                 editing
@@ -1164,7 +1343,12 @@ function DeliveryStep(c: StepCtx) {
                 placeholder="Choose person"
               />
             </KvRow>
-            <KvRow wide label="Approver" ai={aiGates && !!g.approver}>
+            <KvRow
+              wide
+              label="Approver"
+              ai={aiGates && !!g.approver}
+              invalid={show && !g.approver}
+            >
               <Val
                 label="Approver"
                 editing
@@ -1175,16 +1359,24 @@ function DeliveryStep(c: StepCtx) {
                 placeholder="Choose person"
               />
             </KvRow>
-            <Stacked label="Evidence And Acceptance Criteria">
+            <Stacked
+              label="Evidence And Acceptance Criteria"
+              invalid={show && !g.criteria.trim()}
+            >
               <TextBox
                 label="Evidence and acceptance criteria"
                 editing
+                invalid={show && !g.criteria.trim()}
                 value={g.criteria}
                 onChange={(v) => setGate(i, { criteria: v })}
                 placeholder="Write here"
               />
             </Stacked>
-            <Stacked label="Gate Scope">
+            <Stacked
+              label="Gate Scope"
+              invalid={show && !g.workstreams.length}
+              note="Select at least one workstream"
+            >
               {(d.workstreams.length ? d.workstreams : [emptyWorkstream()]).map(
                 (w, j) => {
                   const n = wsName(w, j);
@@ -1225,6 +1417,7 @@ function WorkstreamItem({
   w,
   d,
   ai,
+  show,
   up,
   remove,
 }: {
@@ -1232,13 +1425,19 @@ function WorkstreamItem({
   w: Workstream;
   d: Draft;
   ai: boolean;
+  show?: boolean;
   up: (p: Partial<Workstream>) => void;
   remove: () => void;
 }) {
   const [open, setOpen] = useState(!!w.dependencies);
   return (
     <Item title={`Workstream ${i + 1}`} onRemove={remove}>
-      <KvRow wide label="Workstream" ai={ai && !!w.name}>
+      <KvRow
+        wide
+        label="Workstream"
+        ai={ai && !!w.name}
+        invalid={show && !w.name.trim()}
+      >
         <Val
           label="Workstream"
           editing
@@ -1268,7 +1467,12 @@ function WorkstreamItem({
           placeholder="Choose Team"
         />
       </KvRow>
-      <KvRow wide label="Expected Output" ai={ai && !!w.output}>
+      <KvRow
+        wide
+        label="Expected Output"
+        ai={ai && !!w.output}
+        invalid={show && !w.output.trim()}
+      >
         <Val
           label="Expected Output"
           editing
@@ -1277,7 +1481,12 @@ function WorkstreamItem({
           placeholder="What must this stream produce?"
         />
       </KvRow>
-      <KvRow wide label="Accountable Owner · Team Member" ai={ai && !!w.owner}>
+      <KvRow
+        wide
+        label="Accountable Owner · Team Member"
+        ai={ai && !!w.owner}
+        invalid={show && !w.owner}
+      >
         <Val
           label="Accountable Owner"
           editing
@@ -1421,7 +1630,12 @@ function Delivery2Step(c: StepCtx) {
               set((x) => ({ risks: x.risks.filter((_, j) => j !== i) }))
             }
           >
-            <KvRow wide label="Risk Or Issue" ai={aiRisk && !!r.risk}>
+            <KvRow
+              wide
+              label="Risk Or Issue"
+              ai={aiRisk && !!r.risk}
+              invalid={!!c.error && !r.risk.trim() && !d.noRiskReason.trim()}
+            >
               <Val
                 label="Risk Or Issue"
                 editing
@@ -1699,6 +1913,17 @@ const ACCESS_TEXT: Record<string, string> = {
 };
 
 export function ReviewStep(c: StepCtx) {
+  const k = useKnowledge();
+  const repoCount = k.repos.filter((r) => r.active).length;
+  const sourcesLabel =
+    [
+      k.useUploads && "Uploads",
+      k.useOnline && "Online",
+      repoCount && `${repoCount} Repositories`,
+    ]
+      .filter(Boolean)
+      .join(" + ") || "None";
+  const panelName = panelFor(k.panel).name;
   const { d } = c;
   const missing = missingItems(d);
   const [role, setRole] = useState<"Sponsor" | "Lead" | "Member" | "External">(
@@ -1844,6 +2069,8 @@ export function ReviewStep(c: StepCtx) {
                 label="External Access"
                 value={title(d.externalAccess)}
               />
+              <MiniRow label="Sources" value={sourcesLabel} />
+              <MiniRow label="Model Panel" value={panelName} />
             </div>
           </div>
         </Panel>
@@ -1957,13 +2184,20 @@ export function ReviewStep(c: StepCtx) {
             <button
               type="button"
               onClick={c.create}
-              disabled={missing.length > 0}
+              disabled={missing.length > 0 || c.creating}
+              aria-busy={c.creating || undefined}
               title={
                 missing.length ? "Complete the items above first" : undefined
               }
               className={BLUE_BTN}
             >
-              Create Project
+              {c.creating && (
+                <span
+                  aria-hidden
+                  className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                />
+              )}
+              {c.creating ? "Analysing project…" : "Create Project"}
             </button>
           </div>
         </div>
